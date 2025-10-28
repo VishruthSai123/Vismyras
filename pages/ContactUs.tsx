@@ -55,7 +55,7 @@ const ContactUs: React.FC = () => {
               <Mail className="w-6 h-6 text-purple-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Email Support</h3>
-            <p className="text-gray-600 mb-2">support@vismyras.com</p>
+            <p className="text-gray-600 mb-2">sendrightai@gmail.com</p>
             <p className="text-sm text-gray-500">Response within 24-48 hours</p>
           </div>
 
@@ -73,7 +73,7 @@ const ContactUs: React.FC = () => {
               <MessageSquare className="w-6 h-6 text-purple-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Billing Inquiries</h3>
-            <p className="text-gray-600 mb-2">billing@vismyras.com</p>
+            <p className="text-gray-600 mb-2">sendrightai@gmail.com</p>
             <p className="text-sm text-gray-500">For payment & refund questions</p>
           </div>
         </div>
@@ -243,20 +243,20 @@ const ContactUs: React.FC = () => {
               <div className="space-y-3 text-sm">
                 <div>
                   <strong className="block mb-1">General Support:</strong>
-                  <a href="mailto:support@vismyras.com" className="text-purple-100 hover:text-white">
-                    support@vismyras.com
+                  <a href="mailto:sendrightai@gmail.com" className="text-purple-100 hover:text-white">
+                    sendrightai@gmail.com
                   </a>
                 </div>
                 <div>
                   <strong className="block mb-1">Billing Support:</strong>
-                  <a href="mailto:billing@vismyras.com" className="text-purple-100 hover:text-white">
-                    billing@vismyras.com
+                  <a href="mailto:sendrightai@gmail.com" className="text-purple-100 hover:text-white">
+                    sendrightai@gmail.com
                   </a>
                 </div>
                 <div>
                   <strong className="block mb-1">Legal Inquiries:</strong>
-                  <a href="mailto:legal@vismyras.com" className="text-purple-100 hover:text-white">
-                    legal@vismyras.com
+                  <a href="mailto:sendrightai@gmail.com" className="text-purple-100 hover:text-white">
+                    sendrightai@gmail.com
                   </a>
                 </div>
               </div>

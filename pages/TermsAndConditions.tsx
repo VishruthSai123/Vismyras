@@ -245,7 +245,7 @@ const TermsAndConditions: React.FC = () => {
               For questions about these Terms, please contact us:
             </p>
             <ul className="list-none text-gray-700 space-y-2">
-              <li><strong>Email</strong>: legal@vismyras.com</li>
+              <li><strong>Email</strong>: sendrightai@gmail.com</li>
               <li><strong>Contact Page</strong>:{' '}
                 <Link to="/contact" className="text-purple-600 hover:underline">
                   https://tryonvismyras08.vercel.app/contact

@@ -127,7 +127,7 @@ const RefundPolicy: React.FC = () => {
             
             <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-6">6.1 How to Request</h3>
             <ol className="list-decimal list-inside text-gray-700 space-y-2 ml-4">
-              <li>Contact our support team at <strong>support@vismyras.com</strong></li>
+              <li>Contact our support team at <strong>sendrightai@gmail.com</strong></li>
               <li>Include your:
                 <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
                   <li>Account email address</li>
@@ -230,8 +230,8 @@ const RefundPolicy: React.FC = () => {
               For refund requests or questions about this policy:
             </p>
             <ul className="list-none text-gray-700 space-y-2">
-              <li><strong>Email</strong>: support@vismyras.com</li>
-              <li><strong>Billing Support</strong>: billing@vismyras.com</li>
+              <li><strong>Email</strong>: sendrightai@gmail.com</li>
+              <li><strong>Billing Support</strong>: sendrightai@gmail.com</li>
               <li><strong>Contact Page</strong>:{' '}
                 <Link to="/contact" className="text-purple-600 hover:underline">
                   https://tryonvismyras08.vercel.app/contact

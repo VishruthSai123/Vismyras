@@ -164,8 +164,8 @@ const PrivacyPolicy: React.FC = () => {
             </ul>
             <p className="text-gray-700 mt-4">
               To exercise these rights, contact us at{' '}
-              <a href="mailto:privacy@vismyras.com" className="text-purple-600 hover:underline">
-                privacy@vismyras.com
+              <a href="mailto:sendrightai@gmail.com" className="text-purple-600 hover:underline">
+                sendrightai@gmail.com
               </a>
             </p>
           </section>
@@ -216,7 +216,7 @@ const PrivacyPolicy: React.FC = () => {
               If you have questions about this Privacy Policy, please contact us:
             </p>
             <ul className="list-none text-gray-700 space-y-2">
-              <li><strong>Email</strong>: privacy@vismyras.com</li>
+              <li><strong>Email</strong>: sendrightai@gmail.com</li>
               <li><strong>Contact Page</strong>:{' '}
                 <Link to="/contact" className="text-purple-600 hover:underline">
                   https://tryonvismyras08.vercel.app/contact
