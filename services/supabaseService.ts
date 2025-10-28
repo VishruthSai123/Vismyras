@@ -124,6 +124,8 @@ class SupabaseService {
     });
 
     if (error) {
+      console.error('Supabase signup error:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       throw new AuthError(this.getFriendlyErrorMessage(error.message), error.message);
     }
 
