@@ -249,6 +249,19 @@ const App: React.FC = () => {
       poseImages: { [POSE_INSTRUCTIONS[0]]: id }
     }]);
     setCurrentOutfitIndex(0);
+    
+    // Track first try-on usage immediately
+    try {
+      billingService.consumeTryOn('try-on');
+      refreshUsageStats();
+      syncBillingToSupabase();
+      addToast('First try-on complete! Usage tracked.', 'success', 3000);
+    } catch (err) {
+      if (err instanceof UsageLimitError) {
+        addToast(err.message, 'warning', 7000);
+        setIsPaywallOpen(true);
+      }
+    }
   };
 
   const handleStartOver = () => {
@@ -638,7 +651,47 @@ const App: React.FC = () => {
                     </div>
                   )}
                   
-                  <StartScreen onModelFinalized={handleModelFinalized} onToast={addToast} />
+                  {user ? (
+                    <StartScreen onModelFinalized={handleModelFinalized} onToast={addToast} />
+                  ) : (
+                    <div className="max-w-2xl mx-auto text-center">
+                      <h1 className="text-5xl md:text-6xl font-serif font-bold text-gray-900 leading-tight mb-6">
+                        Vismyras: Visualize Your Style.
+                      </h1>
+                      <p className="text-xl text-gray-600 mb-8">
+                        Sign in to start your virtual try-on experience with AI-powered fashion visualization.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                        <button
+                          onClick={() => setIsAuthModalOpen(true)}
+                          className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-lg text-lg"
+                        >
+                          Get Started - Sign In
+                        </button>
+                      </div>
+                      <p className="text-gray-500 text-sm mt-6">
+                        Free tier includes 3 virtual try-ons per month
+                      </p>
+                      {/* Feature highlights */}
+                      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                          <div className="text-3xl mb-3">🎨</div>
+                          <h3 className="font-semibold text-gray-900 mb-2">AI-Powered</h3>
+                          <p className="text-gray-600 text-sm">Advanced AI creates realistic virtual try-ons</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                          <div className="text-3xl mb-3">👗</div>
+                          <h3 className="font-semibold text-gray-900 mb-2">Extensive Wardrobe</h3>
+                          <p className="text-gray-600 text-sm">Try on various clothes and accessories</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                          <div className="text-3xl mb-3">💾</div>
+                          <h3 className="font-semibold text-gray-900 mb-2">Save & Share</h3>
+                          <p className="text-gray-600 text-sm">Save your favorite looks and share them</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div

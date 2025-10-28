@@ -11,6 +11,8 @@ import { generateModelImage } from '../services/geminiService';
 import Spinner from './Spinner';
 import { getFriendlyErrorMessage, useObjectURL } from '../lib/utils';
 import { RateLimitError } from '../lib/rateLimiter';
+import { billingService } from '../services/billingService';
+import { UsageLimitError } from '../types/billing';
 
 interface StartScreenProps {
   onModelFinalized: (modelId: string) => void;
@@ -36,6 +38,14 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelFinalized, onToast }) 
         return;
     }
 
+    // Check usage limit before processing
+    const { allowed, reason } = billingService.canMakeRequest();
+    if (!allowed) {
+        setError(reason || 'No credits available');
+        onToast?.(reason || 'No credits available', 'warning');
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (e) => {
         const dataUrl = e.target?.result as string;
@@ -49,6 +59,9 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelFinalized, onToast }) 
             onToast?.('Model created successfully! 🎉', 'success');
         } catch (err) {
             if (err instanceof RateLimitError) {
+                setError(err.message);
+                onToast?.(err.message, 'warning');
+            } else if (err instanceof UsageLimitError) {
                 setError(err.message);
                 onToast?.(err.message, 'warning');
             } else {
