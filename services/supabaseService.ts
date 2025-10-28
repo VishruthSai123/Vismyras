@@ -292,14 +292,22 @@ class SupabaseService {
           if (session?.user) {
             lastUserId = session.user.id;
             
-            // Get profile (create if doesn't exist)
+            // Get profile (create if doesn't exist, or construct from session if tables don't exist)
             let profile: UserProfile;
             try {
               profile = await this.getUserProfile(session.user.id);
             } catch (err) {
-              // Profile doesn't exist, create it
-              const provider = session.user.app_metadata.provider || 'email';
-              profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
+              // Profile query failed - either table doesn't exist or network issue
+              // Construct profile from session data
+              profile = {
+                id: session.user.id,
+                email: session.user.email!,
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+                avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || '',
+                auth_provider: (session.user.app_metadata?.provider || 'email') as 'email' | 'google',
+                created_at: session.user.created_at,
+                updated_at: session.user.created_at,
+              };
             }
 
             // Get billing (use defaults if fails)
@@ -326,14 +334,28 @@ class SupabaseService {
         if (event === 'SIGNED_IN' && session?.user) {
           lastUserId = session.user.id;
           
-          // Get profile (create if doesn't exist)
+          // Get profile (create if doesn't exist, or construct from session if tables don't exist)
           let profile: UserProfile;
           try {
             profile = await this.getUserProfile(session.user.id);
           } catch (err) {
-            // Profile doesn't exist, create it
-            const provider = session.user.app_metadata.provider || 'email';
-            profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
+            // Profile query failed - construct from session data
+            profile = {
+              id: session.user.id,
+              email: session.user.email!,
+              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+              avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || '',
+              auth_provider: (session.user.app_metadata?.provider || 'email') as 'email' | 'google',
+              created_at: session.user.created_at,
+              updated_at: session.user.created_at,
+            };
+            
+            // Try to create profile in DB (will fail silently if table doesn't exist)
+            try {
+              await this.createUserProfile(session.user, profile.auth_provider);
+            } catch (createErr) {
+              // Ignore - tables might not exist yet
+            }
           }
 
           // Get billing (use defaults if fails)
@@ -353,7 +375,22 @@ class SupabaseService {
           // Only update if user hasn't changed
           if (lastUserId === session.user.id) {
             try {
-              const profile = await this.getUserProfile(session.user.id);
+              // Try to get profile from DB
+              let profile: UserProfile;
+              try {
+                profile = await this.getUserProfile(session.user.id);
+              } catch (err) {
+                // Construct from session if DB fails
+                profile = {
+                  id: session.user.id,
+                  email: session.user.email!,
+                  full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+                  avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || '',
+                  auth_provider: (session.user.app_metadata?.provider || 'email') as 'email' | 'google',
+                  created_at: session.user.created_at,
+                  updated_at: session.user.created_at,
+                };
+              }
               
               let billing: any;
               try {
@@ -376,7 +413,22 @@ class SupabaseService {
           callback(null);
         } else if (event === 'USER_UPDATED' && session?.user) {
           try {
-            const profile = await this.getUserProfile(session.user.id);
+            // Try to get profile from DB
+            let profile: UserProfile;
+            try {
+              profile = await this.getUserProfile(session.user.id);
+            } catch (err) {
+              // Construct from session if DB fails
+              profile = {
+                id: session.user.id,
+                email: session.user.email!,
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+                avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || '',
+                auth_provider: (session.user.app_metadata?.provider || 'email') as 'email' | 'google',
+                created_at: session.user.created_at,
+                updated_at: session.user.created_at,
+              };
+            }
             
             let billing: any;
             try {
@@ -500,9 +552,9 @@ class SupabaseService {
     const client = this.getClient();
 
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (reduced to 3s since we have fallback)
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Profile query timeout')), 5000)
+        setTimeout(() => reject(new Error('Profile query timeout')), 3000)
       );
 
       const queryPromise = client
@@ -530,9 +582,9 @@ class SupabaseService {
     const client = this.getClient();
 
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (reduced to 3s since we have fallback)
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Billing query timeout')), 5000)
+        setTimeout(() => reject(new Error('Billing query timeout')), 3000)
       );
 
       const queryPromise = client
