@@ -151,12 +151,12 @@ const AppContent: React.FC = () => {
           billingService.loadFromSupabase(currentUser.billing);
           refreshUsageStats();
         } else {
-          console.log('❌ No authenticated user');
-          setUser(null);
+          console.log('ℹ️ No user from getCurrentUser - waiting for auth event');
+          // Don't set user to null here - let auth state change handle it
         }
       } catch (err) {
         console.error('❌ Error loading auth state:', err);
-        setUser(null);
+        // Don't set user to null on error - let auth state change handle it
       } finally {
         if (mounted) {
           console.log('✅ Auth loading complete, setting isAuthLoading = false');

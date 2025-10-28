@@ -293,7 +293,13 @@ class SupabaseService {
               profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
             }
 
-            const billing = await this.loadUserBilling(session.user.id);
+            let billing: any;
+            try {
+              billing = await this.loadUserBilling(session.user.id);
+            } catch (err) {
+              console.warn('⚠️ Using default billing for session restore');
+              billing = billingService.getUserBilling();
+            }
 
             callback({
               auth: session.user,
@@ -302,6 +308,7 @@ class SupabaseService {
             });
           } catch (err) {
             console.error('❌ Error restoring session:', err);
+            // Don't call callback if profile creation fails
           }
         }
         // Don't call callback with null on INITIAL_SESSION without session
@@ -324,7 +331,13 @@ class SupabaseService {
             profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
           }
 
-          const billing = await this.loadUserBilling(session.user.id);
+          let billing: any;
+          try {
+            billing = await this.loadUserBilling(session.user.id);
+          } catch (err) {
+            console.warn('⚠️ Using default billing for sign in');
+            billing = billingService.getUserBilling();
+          }
 
           callback({
             auth: session.user,
@@ -333,6 +346,7 @@ class SupabaseService {
           });
         } catch (err) {
           console.error('❌ Error handling sign in:', err);
+          // Don't call callback if profile creation fails
         }
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         console.log('🔄 Token refreshed for user:', session.user.email);
@@ -340,7 +354,14 @@ class SupabaseService {
         if (lastUserId === session.user.id) {
           try {
             const profile = await this.getUserProfile(session.user.id);
-            const billing = await this.loadUserBilling(session.user.id);
+            
+            let billing: any;
+            try {
+              billing = await this.loadUserBilling(session.user.id);
+            } catch (err) {
+              console.warn('⚠️ Using default billing for token refresh');
+              billing = billingService.getUserBilling();
+            }
 
             callback({
               auth: session.user,
@@ -360,7 +381,14 @@ class SupabaseService {
         console.log('🔄 User data updated');
         try {
           const profile = await this.getUserProfile(session.user.id);
-          const billing = await this.loadUserBilling(session.user.id);
+          
+          let billing: any;
+          try {
+            billing = await this.loadUserBilling(session.user.id);
+          } catch (err) {
+            console.warn('⚠️ Using default billing for user update');
+            billing = billingService.getUserBilling();
+          }
           
           callback({
             auth: session.user,
