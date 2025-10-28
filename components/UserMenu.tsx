@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { User, LogOut, Settings, CreditCard, BarChart3 } from 'lucide-react';
+import { User, LogOut, Settings, CreditCard, BarChart3, Sparkles } from 'lucide-react';
 import { VismyrasUser } from '../types/auth';
 
 interface UserMenuProps {
@@ -13,9 +13,10 @@ interface UserMenuProps {
   onLogout: () => void;
   onViewBilling: () => void;
   onViewUsage: () => void;
+  onViewStyles: () => void;
 }
 
-const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout, onViewBilling, onViewUsage }) => {
+const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout, onViewBilling, onViewUsage, onViewStyles }) => {
   const [isOpen, setIsOpen] = React.useState(false);
 
   const initials = user.profile.full_name
@@ -86,6 +87,17 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout, onViewBilling, onVi
 
             {/* Menu Items */}
             <div className="p-2">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onViewStyles();
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Sparkles size={18} />
+                <span className="font-medium">Your Styles</span>
+              </button>
+
               <button
                 onClick={() => {
                   setIsOpen(false);

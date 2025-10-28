@@ -5,6 +5,12 @@
 
 import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-js';
 import { SignUpCredentials, LoginCredentials, UserProfile, VismyrasUser, AuthError } from '../types/auth';
+import { 
+  UserOutfit, 
+  SaveOutfitParams, 
+  UpdateOutfitParams, 
+  OutfitHistoryFilters 
+} from '../types/outfitHistory';
 import { billingService } from './billingService';
 
 /**
@@ -536,6 +542,196 @@ class SupabaseService {
   public async isAuthenticated(): Promise<boolean> {
     const session = await this.getSession();
     return session !== null;
+  }
+
+  // ==========================================
+  // OUTFIT HISTORY METHODS
+  // ==========================================
+
+  /**
+   * Save a new outfit to history
+   */
+  public async saveOutfit(userId: string, params: SaveOutfitParams): Promise<UserOutfit> {
+    const client = this.getClient();
+
+    const { data, error } = await client
+      .from('user_outfit_history')
+      .insert({
+        user_id: userId,
+        outfit_name: params.outfit_name || `Outfit ${new Date().toLocaleDateString()}`,
+        description: params.description,
+        tags: params.tags || [],
+        model_image_url: params.model_image_url,
+        model_image_id: params.model_image_id,
+        garment_layers: params.garment_layers,
+        final_image_url: params.final_image_url,
+        final_image_id: params.final_image_id,
+        pose_variation: params.pose_variation,
+        generation_settings: params.generation_settings,
+        is_favorite: params.is_favorite || false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving outfit:', error);
+      throw new Error('Failed to save outfit');
+    }
+
+    return data;
+  }
+
+  /**
+   * Get user's outfit history
+   */
+  public async getOutfitHistory(
+    userId: string,
+    filters?: OutfitHistoryFilters
+  ): Promise<{ outfits: UserOutfit[]; total: number }> {
+    const client = this.getClient();
+
+    let query = client
+      .from('user_outfit_history')
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId);
+
+    // Apply filters
+    if (filters?.favorites_only) {
+      query = query.eq('is_favorite', true);
+    }
+
+    if (filters?.tags && filters.tags.length > 0) {
+      query = query.contains('tags', filters.tags);
+    }
+
+    if (filters?.search) {
+      query = query.or(`outfit_name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+    }
+
+    // Sorting
+    const sortBy = filters?.sort_by || 'created_at';
+    const sortOrder = filters?.sort_order || 'desc';
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+    // Pagination
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    if (filters?.offset) {
+      query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error('Error fetching outfit history:', error);
+      throw new Error('Failed to load outfit history');
+    }
+
+    return {
+      outfits: data || [],
+      total: count || 0,
+    };
+  }
+
+  /**
+   * Get a single outfit by ID
+   */
+  public async getOutfit(userId: string, outfitId: string): Promise<UserOutfit | null> {
+    const client = this.getClient();
+
+    const { data, error } = await client
+      .from('user_outfit_history')
+      .select('*')
+      .eq('id', outfitId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching outfit:', error);
+      return null;
+    }
+
+    return data;
+  }
+
+  /**
+   * Update an outfit
+   */
+  public async updateOutfit(
+    userId: string,
+    outfitId: string,
+    updates: UpdateOutfitParams
+  ): Promise<UserOutfit> {
+    const client = this.getClient();
+
+    const { data, error } = await client
+      .from('user_outfit_history')
+      .update(updates)
+      .eq('id', outfitId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating outfit:', error);
+      throw new Error('Failed to update outfit');
+    }
+
+    return data;
+  }
+
+  /**
+   * Delete an outfit
+   */
+  public async deleteOutfit(userId: string, outfitId: string): Promise<void> {
+    const client = this.getClient();
+
+    const { error } = await client
+      .from('user_outfit_history')
+      .delete()
+      .eq('id', outfitId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error deleting outfit:', error);
+      throw new Error('Failed to delete outfit');
+    }
+  }
+
+  /**
+   * Toggle favorite status
+   */
+  public async toggleFavorite(userId: string, outfitId: string): Promise<UserOutfit> {
+    const client = this.getClient();
+
+    // Get current status
+    const outfit = await this.getOutfit(userId, outfitId);
+    if (!outfit) {
+      throw new Error('Outfit not found');
+    }
+
+    return this.updateOutfit(userId, outfitId, {
+      is_favorite: !outfit.is_favorite,
+    });
+  }
+
+  /**
+   * Increment view count
+   */
+  public async incrementViewCount(userId: string, outfitId: string): Promise<void> {
+    const client = this.getClient();
+
+    const { error } = await client.rpc('increment_outfit_views', {
+      outfit_id: outfitId,
+      p_user_id: userId,
+    });
+
+    if (error) {
+      // Non-critical error, just log it
+      console.error('Error incrementing view count:', error);
+    }
   }
 }
 

@@ -38,6 +38,7 @@ import TermsAndConditions from './pages/TermsAndConditions';
 import RefundPolicy from './pages/RefundPolicy';
 import ContactUs from './pages/ContactUs';
 import UsageScreen from './pages/UsageScreen';
+import YourStyles from './pages/YourStyles';
 
 const POSE_INSTRUCTIONS = [
   "Full frontal view, hands on hips",
@@ -355,6 +356,11 @@ const AppContent: React.FC = () => {
       addToast(`Successfully added ${garmentInfo.name}!`, 'success', 3000);
       refreshUsageStats(); // Update usage display
       await syncBillingToSupabase(); // Sync to cloud
+      
+      // Auto-save outfit after successful garment addition
+      if (user?.auth?.id) {
+        setTimeout(() => autoSaveOutfit(), 1000); // Delay to ensure state updates
+      }
     } catch (err) {
       if (err instanceof UsageLimitError) {
         addToast(err.message, 'warning', 7000);
@@ -595,6 +601,41 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
+  // Auto-save outfit to database
+  const autoSaveOutfit = useCallback(async () => {
+    if (!user?.auth?.id || outfitHistory.length === 0) return;
+    
+    try {
+      const modelBlob = await db.getImage(modelImageId);
+      if (!modelBlob) return;
+      
+      const modelUrl = URL.createObjectURL(modelBlob);
+      const currentLayer = outfitHistory[currentOutfitIndex];
+      const finalImageId = currentLayer?.poseImages?.[POSE_INSTRUCTIONS[currentPoseIndex]];
+      
+      let finalImageUrl = null;
+      if (finalImageId) {
+        const finalBlob = await db.getImage(finalImageId);
+        if (finalBlob) finalImageUrl = URL.createObjectURL(finalBlob);
+      }
+
+      await supabaseService.saveOutfit(user.auth.id, {
+        outfit_name: `Outfit ${new Date().toLocaleDateString()}`,
+        model_image_url: modelUrl,
+        model_image_id: modelImageId,
+        garment_layers: outfitHistory,
+        final_image_url: finalImageUrl,
+        final_image_id: finalImageId,
+        pose_variation: POSE_INSTRUCTIONS[currentPoseIndex],
+      });
+      
+      console.log('✅ Outfit auto-saved');
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      // Silent fail - don't interrupt user workflow
+    }
+  }, [user, outfitHistory, currentOutfitIndex, modelImageId, currentPoseIndex]);
+
   const handleLogout = useCallback(async () => {
     try {
       console.log('🚪 Logging out...');
@@ -611,6 +652,7 @@ const AppContent: React.FC = () => {
       
       // Close usage screen if open
       setShowUsageScreen(false);
+      setShowStylesScreen(false);
       
       // Clear all localStorage except auth token (Supabase handles that)
       localStorage.removeItem('vismyras_modelImageId');
@@ -632,10 +674,32 @@ const AppContent: React.FC = () => {
   }, []);
 
   const [showUsageScreen, setShowUsageScreen] = useState(false);
+  const [showStylesScreen, setShowStylesScreen] = useState(false);
 
   const handleViewUsage = useCallback(() => {
     setShowUsageScreen(true);
   }, []);
+
+  const handleViewStyles = useCallback(() => {
+    setShowStylesScreen(true);
+  }, []);
+
+  const handleRestoreOutfit = useCallback((outfit: any) => {
+    // Restore the outfit to the workspace
+    if (outfit.model_image_url) {
+      setModelImageId(outfit.model_image_id || `restored-${Date.now()}`);
+      // Store restored image URL for later use
+      localStorage.setItem('vismyras_restored_model_url', outfit.model_image_url);
+    }
+    
+    if (outfit.garment_layers && outfit.garment_layers.length > 0) {
+      setOutfitHistory(outfit.garment_layers);
+      setCurrentOutfitIndex(outfit.garment_layers.length - 1);
+    }
+    
+    setShowStylesScreen(false);
+    addToast('Outfit restored! Continue editing or add more items.', 'success', 4000);
+  }, [addToast]);
 
 
   const viewVariants = {
@@ -666,7 +730,13 @@ const AppContent: React.FC = () => {
         
         {/* Main App */}
         <Route path="/" element={
-          showUsageScreen ? (
+          showStylesScreen ? (
+            <YourStyles 
+              onBack={() => setShowStylesScreen(false)} 
+              onRestoreOutfit={handleRestoreOutfit}
+              userId={user?.auth?.id || ''}
+            />
+          ) : showUsageScreen ? (
             <UsageScreen onBack={() => setShowUsageScreen(false)} />
           ) : (
           <div className="font-sans">
@@ -696,7 +766,7 @@ const AppContent: React.FC = () => {
                   {/* User Menu Button (Top Right) */}
                   {user && (
                     <div className="absolute top-4 right-4 z-50">
-                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} />
+                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} onViewStyles={handleViewStyles} />
                     </div>
                   )}
                   
@@ -769,7 +839,7 @@ const AppContent: React.FC = () => {
                   {/* User Menu in Header (Top Right) */}
                   {user && (
                     <div className="absolute top-4 right-6 z-50">
-                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} />
+                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} onViewStyles={handleViewStyles} />
                     </div>
                   )}
                   
