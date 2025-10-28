@@ -10,9 +10,11 @@ import { Compare } from './ui/compare';
 import { generateModelImage } from '../services/geminiService';
 import Spinner from './Spinner';
 import { getFriendlyErrorMessage, useObjectURL } from '../lib/utils';
+import { RateLimitError } from '../lib/rateLimiter';
 
 interface StartScreenProps {
   onModelFinalized: (modelId: string) => void;
+  onToast?: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
 const CompareWithObjectURL: React.FC<any> = ({ firstImage, secondImageId, ...props }) => {
@@ -21,7 +23,7 @@ const CompareWithObjectURL: React.FC<any> = ({ firstImage, secondImageId, ...pro
 };
 
 
-const StartScreen: React.FC<StartScreenProps> = ({ onModelFinalized }) => {
+const StartScreen: React.FC<StartScreenProps> = ({ onModelFinalized, onToast }) => {
   const [userImageUrl, setUserImageUrl] = useState<string | null>(null);
   const [generatedModelId, setGeneratedModelId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -30,6 +32,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelFinalized }) => {
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
         setError('Please select an image file.');
+        onToast?.('Please select an image file.', 'error');
         return;
     }
 
@@ -43,15 +46,23 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelFinalized }) => {
         try {
             const resultId = await generateModelImage(file);
             setGeneratedModelId(resultId);
+            onToast?.('Model created successfully! 🎉', 'success');
         } catch (err) {
-            setError(getFriendlyErrorMessage(err, 'Failed to create model'));
+            if (err instanceof RateLimitError) {
+                setError(err.message);
+                onToast?.(err.message, 'warning');
+            } else {
+                const errorMsg = getFriendlyErrorMessage(err, 'Failed to create model');
+                setError(errorMsg);
+                onToast?.(errorMsg, 'error');
+            }
             setUserImageUrl(null);
         } finally {
             setIsGenerating(false);
         }
     };
     reader.readAsDataURL(file);
-  }, []);
+  }, [onToast]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

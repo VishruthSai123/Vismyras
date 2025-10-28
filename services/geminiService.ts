@@ -5,6 +5,9 @@
 
 import { GoogleGenAI, GenerateContentResponse, Modality } from "@google/genai";
 import { db, base64ToBlob } from '../lib/utils';
+import { checkAllLimits } from '../lib/rateLimiter';
+import { billingService } from './billingService';
+import { UsageLimitError } from '../types/billing';
 
 const fileToPart = async (file: File) => {
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -67,6 +70,7 @@ const model = 'gemini-2.5-flash-image';
 
 export const generateModelImage = async (userImage: File): Promise<string> => {
     await db.init();
+    checkAllLimits(); // Check rate limits before API call
     const userImagePart = await fileToPart(userImage);
     const prompt = "You are an expert fashion photographer AI. Transform the person in this image into a full-body fashion model photo suitable for an e-commerce website. The background must be a clean, neutral studio backdrop (light gray, #f0f0f0). The person should have a neutral, professional model expression. Preserve the person's identity, unique features, and body type, but place them in a standard, relaxed standing model pose. The final image must be photorealistic. Return ONLY the final image.";
     const response = await ai.models.generateContent({
@@ -81,6 +85,14 @@ export const generateModelImage = async (userImage: File): Promise<string> => {
 
 export const generateVirtualTryOnImage = async (modelImageId: string, garmentImage: File, garmentCategory: string): Promise<string> => {
     await db.init();
+    
+    // Check usage limits before making API call
+    const { allowed, reason } = billingService.canMakeRequest();
+    if (!allowed) {
+        throw new UsageLimitError(reason || 'Usage limit exceeded', 0, 0, billingService.getUserBilling().subscription.tier);
+    }
+    
+    checkAllLimits(); // Check rate limits before API call
     const modelImagePart = await dbImageIdToPart(modelImageId);
     const garmentImagePart = await fileToPart(garmentImage);
     
@@ -113,11 +125,17 @@ export const generateVirtualTryOnImage = async (modelImageId: string, garmentIma
             responseModalities: [Modality.IMAGE, Modality.TEXT],
         },
     });
-    return handleApiResponse(response);
+    const imageId = await handleApiResponse(response);
+    
+    // Consume credit after successful generation
+    billingService.consumeTryOn('try-on');
+    
+    return imageId;
 };
 
 export const generatePoseVariation = async (tryOnImageId: string, poseInstruction: string): Promise<string> => {
     await db.init();
+    checkAllLimits(); // Check rate limits before API call
     const tryOnImagePart = await dbImageIdToPart(tryOnImageId);
     const prompt = `You are an expert fashion photographer AI. Take this image and regenerate it from a different perspective. The person, clothing, and background style must remain identical. The new perspective should be: "${poseInstruction}". Return ONLY the final image.`;
     const response = await ai.models.generateContent({
@@ -132,6 +150,7 @@ export const generatePoseVariation = async (tryOnImageId: string, poseInstructio
 
 export const generateChatEdit = async (baseImageId: string, userPrompt: string, referenceImage?: File): Promise<string> => {
     await db.init();
+    checkAllLimits(); // Check rate limits before API call
     const modelImagePart = await dbImageIdToPart(baseImageId);
     
     const prompt = `You are an expert AI photo editor and fashion stylist. Edit the provided base image according to the user's request. The user's request is: "${userPrompt}". If a reference image is provided, use it for inspiration for the edit. Preserve the person's identity and the overall photorealistic style of the image. Only return the final edited image, with no other text or explanation.`;

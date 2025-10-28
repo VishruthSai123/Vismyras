@@ -13,11 +13,22 @@ import SavedOutfitsPanel from './components/PosePanel';
 import { generateVirtualTryOnImage, generatePoseVariation, generateChatEdit } from './services/geminiService';
 import { OutfitLayer, WardrobeItem, SavedOutfit } from './types';
 import { getFriendlyErrorMessage, db } from './lib/utils';
+import { RateLimitError } from './lib/rateLimiter';
+import { UsageLimitError, SubscriptionTier } from './types/billing';
+import { billingService } from './services/billingService';
+import { razorpayService } from './services/razorpayService';
+import { supabaseService } from './services/supabaseService';
+import { VismyrasUser, SignUpCredentials, LoginCredentials, AuthError } from './types/auth';
 import Header from './components/Header';
+import AuthModal from './components/AuthModal';
+import UserMenu from './components/UserMenu';
 import Footer from './components/Footer';
 import Spinner from './components/Spinner';
 import ChatFab from './components/ChatFab';
 import ChatPanel from './components/ChatPanel';
+import ToastContainer, { Toast } from './components/Toast';
+import UsageDisplay from './components/UsageDisplay';
+import PaywallModal from './components/PaywallModal';
 import { defaultWardrobe } from './wardrobe';
 
 const POSE_INSTRUCTIONS = [
@@ -66,6 +77,78 @@ const App: React.FC = () => {
   const isMobile = useMediaQuery('(max-width: 767px)');
   
   const [isStateLoaded, setIsStateLoaded] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [usageStats, setUsageStats] = useState(billingService.getUsageStats());
+  
+  // Auth state
+  const [user, setUser] = useState<VismyrasUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Toast helper functions
+  const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration = 5000) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts(prev => [...prev, { id, message, type, duration }]);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  // Update usage stats
+  const refreshUsageStats = useCallback(() => {
+    setUsageStats(billingService.getUsageStats());
+  }, []);
+
+  // Sync billing data to Supabase
+  const syncBillingToSupabase = useCallback(async () => {
+    if (user) {
+      const billingData = billingService.getBillingDataForSync();
+      await supabaseService.saveBillingData(user.auth.id, billingData);
+    }
+  }, [user]);
+
+  // Initialize Supabase and check auth state
+  useEffect(() => {
+    supabaseService.initialize();
+
+    const loadAuth = async () => {
+      try {
+        const currentUser = await supabaseService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          billingService.setCurrentUser(currentUser.auth.id);
+          billingService.loadFromSupabase(currentUser.billing);
+          refreshUsageStats();
+          addToast(`Welcome back, ${currentUser.profile.full_name || 'User'}! 👋`, 'success', 4000);
+        }
+      } catch (err) {
+        console.error('Error loading auth state:', err);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+
+    loadAuth();
+
+    // Subscribe to auth state changes
+    const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
+      setUser(newUser);
+      if (newUser) {
+        billingService.setCurrentUser(newUser.auth.id);
+        billingService.loadFromSupabase(newUser.billing);
+        refreshUsageStats();
+      } else {
+        billingService.setCurrentUser(null);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Effect to load state from localStorage and IndexedDB on initial mount
   useEffect(() => {
@@ -80,6 +163,14 @@ const App: React.FC = () => {
             setCurrentOutfitIndex(JSON.parse(localStorage.getItem('vismyras_currentOutfitIndex') || '0'));
             setWardrobe(JSON.parse(localStorage.getItem('vismyras_wardrobe') || JSON.stringify(defaultWardrobe)));
             setSavedOutfits(JSON.parse(localStorage.getItem('vismyras_savedOutfits') || '[]'));
+            if (user) {
+              addToast('Welcome back! Your session has been restored. 👋', 'info', 4000);
+            }
+        } else {
+            if (!user) {
+              // Show auth prompt for new users
+              setIsAuthModalOpen(true);
+            }
         }
       } catch (e) {
         console.error("Failed to load saved state:", e);
@@ -89,8 +180,11 @@ const App: React.FC = () => {
         setIsStateLoaded(true);
       }
     };
-    loadState();
-  }, []);
+    
+    if (!isAuthLoading) {
+      loadState();
+    }
+  }, [isAuthLoading, user]);
 
   // Effect to save state to localStorage whenever it changes
   useEffect(() => {
@@ -204,8 +298,20 @@ const App: React.FC = () => {
         }
         return [...prev, garmentInfo];
       });
+      addToast(`Successfully added ${garmentInfo.name}!`, 'success', 3000);
+      refreshUsageStats(); // Update usage display
+      await syncBillingToSupabase(); // Sync to cloud
     } catch (err) {
-      setError(getFriendlyErrorMessage(err, 'Failed to apply garment'));
+      if (err instanceof UsageLimitError) {
+        addToast(err.message, 'warning', 7000);
+        setIsPaywallOpen(true); // Show paywall modal
+      } else if (err instanceof RateLimitError) {
+        addToast(err.message, 'warning', 7000);
+      } else {
+        const errorMsg = getFriendlyErrorMessage(err, 'Failed to apply garment');
+        setError(errorMsg);
+        addToast(errorMsg, 'error');
+      }
     } finally {
       setIsLoading(false);
       setLoadingMessage('');
@@ -241,7 +347,7 @@ const App: React.FC = () => {
     setCurrentPoseIndex(newIndex);
 
     try {
-      const newImageId = await generatePoseVariation(baseImageForPoseChange, poseInstruction);
+      const newImageId = await generatePoseVariation(baseImageForPoseChange as string, poseInstruction);
       setOutfitHistory(prevHistory => {
         const newHistory = [...prevHistory];
         const updatedLayer = { ...newHistory[currentOutfitIndex] };
@@ -249,8 +355,15 @@ const App: React.FC = () => {
         newHistory[currentOutfitIndex] = updatedLayer;
         return newHistory;
       });
+      addToast('Pose changed successfully!', 'success', 2000);
     } catch (err) {
-      setError(getFriendlyErrorMessage(err, 'Failed to change pose'));
+      if (err instanceof RateLimitError) {
+        addToast(err.message, 'warning', 7000);
+      } else {
+        const errorMsg = getFriendlyErrorMessage(err, 'Failed to change pose');
+        setError(errorMsg);
+        addToast(errorMsg, 'error');
+      }
       setCurrentPoseIndex(prevPoseIndex);
     } finally {
       setIsLoading(false);
@@ -266,6 +379,7 @@ const App: React.FC = () => {
         previewUrl: displayImageId,
     };
     setSavedOutfits(prev => [newSavedOutfit, ...prev]);
+    addToast('Outfit saved successfully! 💾', 'success', 3000);
   };
 
   const handleLoadOutfit = (outfitToLoad: SavedOutfit) => {
@@ -273,10 +387,12 @@ const App: React.FC = () => {
     setOutfitHistory(outfitToLoad.layers);
     setCurrentOutfitIndex(outfitToLoad.layers.length - 1);
     setCurrentPoseIndex(0);
+    addToast('Outfit loaded! 👗', 'success', 2000);
   };
 
   const handleDeleteOutfit = (outfitId: string) => {
     setSavedOutfits(prev => prev.filter(o => o.id !== outfitId));
+    addToast('Outfit deleted', 'info', 2000);
   };
 
   const handleChatSubmit = useCallback(async (prompt: string, image?: File) => {
@@ -299,14 +415,149 @@ const App: React.FC = () => {
             return newHistory;
         });
         setCurrentPoseIndex(0);
+        addToast('Style updated successfully! ✨', 'success', 3000);
         
     } catch (err) {
-        setError(getFriendlyErrorMessage(err, 'Failed to apply your edit'));
+        if (err instanceof RateLimitError) {
+            addToast(err.message, 'warning', 7000);
+        } else {
+            const errorMsg = getFriendlyErrorMessage(err, 'Failed to apply your edit');
+            setError(errorMsg);
+            addToast(errorMsg, 'error');
+        }
     } finally {
         setIsLoading(false);
         setLoadingMessage('');
     }
   }, [displayImageId, isLoading, currentOutfitIndex]);
+
+  // Payment handlers
+  const handleSubscribe = useCallback(async (tier: SubscriptionTier) => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      addToast('Please sign in to upgrade your subscription', 'warning', 5000);
+      return;
+    }
+
+    if (tier === SubscriptionTier.PREMIUM) {
+      setIsLoading(true);
+      setLoadingMessage('Opening payment gateway...');
+      
+      await razorpayService.subscribeTomonth(
+        199,
+        async (response) => {
+          setIsLoading(false);
+          setLoadingMessage('');
+          setIsPaywallOpen(false);
+          refreshUsageStats();
+          await syncBillingToSupabase();
+          addToast('🎉 Welcome to Premium! You now have 25 try-ons per month.', 'success', 5000);
+        },
+        (error) => {
+          setIsLoading(false);
+          setLoadingMessage('');
+          addToast(error.message || 'Payment failed. Please try again.', 'error', 5000);
+        }
+      );
+    }
+  }, [addToast, refreshUsageStats, syncBillingToSupabase, user]);
+
+  const handleBuyCredits = useCallback(async (tryOns: number, price: number) => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      addToast('Please sign in to purchase credits', 'warning', 5000);
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadingMessage('Opening payment gateway...');
+    
+    await razorpayService.buyCredits(
+      tryOns,
+      price,
+      async (response) => {
+        setIsLoading(false);
+        setLoadingMessage('');
+        setIsPaywallOpen(false);
+        refreshUsageStats();
+        await syncBillingToSupabase();
+        addToast(`✅ Success! Added ${tryOns} try-on${tryOns > 1 ? 's' : ''} to your account.`, 'success', 5000);
+      },
+      (error) => {
+        setIsLoading(false);
+        setLoadingMessage('');
+        addToast(error.message || 'Payment failed. Please try again.', 'error', 5000);
+      }
+    );
+  }, [addToast, refreshUsageStats, syncBillingToSupabase, user]);
+
+  const handleUpgradeClick = useCallback(() => {
+    setIsPaywallOpen(true);
+  }, []);
+
+  // Auth handlers
+  const handleSignUp = useCallback(async (credentials: SignUpCredentials) => {
+    try {
+      const newUser = await supabaseService.signUp(credentials);
+      setUser(newUser);
+      billingService.setCurrentUser(newUser.auth.id);
+      setIsAuthModalOpen(false);
+      addToast('🎉 Account created successfully! Welcome to Vismyras!', 'success', 5000);
+      await syncBillingToSupabase();
+    } catch (err) {
+      if (err instanceof AuthError) {
+        throw err; // Let modal handle the error display
+      }
+      throw new AuthError('Failed to create account. Please try again.');
+    }
+  }, [addToast, syncBillingToSupabase]);
+
+  const handleLogin = useCallback(async (credentials: LoginCredentials) => {
+    try {
+      const loggedInUser = await supabaseService.login(credentials);
+      setUser(loggedInUser);
+      billingService.setCurrentUser(loggedInUser.auth.id);
+      billingService.loadFromSupabase(loggedInUser.billing);
+      refreshUsageStats();
+      setIsAuthModalOpen(false);
+      addToast(`Welcome back, ${loggedInUser.profile.full_name || 'User'}!`, 'success', 4000);
+    } catch (err) {
+      if (err instanceof AuthError) {
+        throw err; // Let modal handle the error display
+      }
+      throw new AuthError('Failed to login. Please try again.');
+    }
+  }, [addToast, refreshUsageStats]);
+
+  const handleGoogleSignIn = useCallback(async () => {
+    try {
+      await supabaseService.signInWithGoogle();
+      // OAuth redirect will happen - session will be picked up by onAuthStateChange
+    } catch (err) {
+      if (err instanceof AuthError) {
+        throw err;
+      }
+      throw new AuthError('Failed to sign in with Google. Please try again.');
+    }
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await supabaseService.logout();
+      setUser(null);
+      billingService.setCurrentUser(null);
+      billingService.resetBilling();
+      refreshUsageStats();
+      handleStartOver(); // Clear all app state
+      addToast('Logged out successfully', 'info', 3000);
+    } catch (err) {
+      addToast('Failed to logout. Please try again.', 'error', 3000);
+    }
+  }, [addToast, refreshUsageStats]);
+
+  const handleViewBilling = useCallback(() => {
+    setIsPaywallOpen(true);
+  }, []);
 
 
   const viewVariants = {
@@ -315,17 +566,31 @@ const App: React.FC = () => {
     exit: { opacity: 0, y: -15 },
   };
 
-  if (!isStateLoaded) {
+  if (!isStateLoaded || isAuthLoading) {
     return (
         <div className="w-screen h-screen flex flex-col items-center justify-center bg-gray-50">
             <Spinner />
-            <p className="text-lg font-serif text-gray-700 mt-4">Loading your session...</p>
+            <p className="text-lg font-serif text-gray-700 mt-4">
+              {isAuthLoading ? 'Checking authentication...' : 'Loading your session...'}
+            </p>
         </div>
     );
   }
 
   return (
     <div className="font-sans">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSignUp={handleSignUp}
+        onLogin={handleLogin}
+        onGoogleSignIn={handleGoogleSignIn}
+        isLoading={isLoading}
+      />
+      
       <AnimatePresence mode="wait">
         {!modelImageId ? (
           <motion.div
@@ -337,7 +602,26 @@ const App: React.FC = () => {
             exit="exit"
             transition={{ duration: 0.5, ease: 'easeInOut' }}
           >
-            <StartScreen onModelFinalized={handleModelFinalized} />
+            {/* User Menu Button (Top Right) */}
+            {user && (
+              <div className="absolute top-4 right-4 z-50">
+                <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
+              </div>
+            )}
+            
+            {/* Sign In Button (Top Right) for non-authenticated users */}
+            {!user && (
+              <div className="absolute top-4 right-4 z-50">
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+            
+            <StartScreen onModelFinalized={handleModelFinalized} onToast={addToast} />
           </motion.div>
         ) : (
           <motion.div
@@ -350,6 +634,26 @@ const App: React.FC = () => {
             transition={{ duration: 0.5, ease: 'easeInOut' }}
           >
             <Header />
+            
+            {/* User Menu in Header (Top Right) */}
+            {user && (
+              <div className="absolute top-4 right-6 z-50">
+                <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
+              </div>
+            )}
+            
+            {/* Sign In Button for non-authenticated users */}
+            {!user && (
+              <div className="absolute top-4 right-6 z-50">
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-md text-sm"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+            
             <main className="h-[calc(100vh-4rem)] relative flex flex-col md:flex-row overflow-hidden">
               <div className="w-full h-full flex-grow flex items-center justify-center bg-white pb-16 relative">
                 <Canvas 
@@ -385,6 +689,16 @@ const App: React.FC = () => {
                         <p>{error}</p>
                       </div>
                     )}
+                    <UsageDisplay
+                      used={usageStats.used}
+                      limit={usageStats.limit}
+                      remaining={usageStats.remaining}
+                      oneTimeCredits={usageStats.oneTimeCredits}
+                      percentUsed={usageStats.percentUsed}
+                      tier={usageStats.tier}
+                      daysUntilReset={usageStats.daysUntilReset}
+                      onUpgradeClick={handleUpgradeClick}
+                    />
                     <OutfitStack 
                       outfitHistory={activeOutfitLayers}
                       onRemoveLastGarment={handleRemoveLastGarment}
@@ -430,6 +744,14 @@ const App: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+            
+            <PaywallModal
+              isOpen={isPaywallOpen}
+              onClose={() => setIsPaywallOpen(false)}
+              onSubscribe={handleSubscribe}
+              onBuyCredits={handleBuyCredits}
+              currentTier={usageStats.tier}
+            />
           </motion.div>
         )}
       </AnimatePresence>
