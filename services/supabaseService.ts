@@ -110,30 +110,43 @@ class SupabaseService {
   /**
    * Sign up with email/password
    */
-  public async signUp(credentials: SignUpCredentials): Promise<VismyrasUser> {
+  public async signUp(credentials: SignUpCredentials): Promise<VismyrasUser | null> {
     const client = this.getClient();
 
-    const { data, error } = await client.auth.signUp({
-      email: credentials.email,
-      password: credentials.password,
-      options: {
-        data: {
-          full_name: credentials.fullName || '',
+    try {
+      const { data, error } = await client.auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}`,
+          data: {
+            full_name: credentials.fullName || '',
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      console.error('Supabase signup error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      throw new AuthError(this.getFriendlyErrorMessage(error.message), error.message);
+      if (error) {
+        console.error('Supabase signup error:', error);
+        throw new AuthError(this.getFriendlyErrorMessage(error.message), error.message);
+      }
+
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        // Email confirmation required - user needs to check email
+        console.log('Email confirmation required for:', data.user.email);
+        return null; // Return null to indicate confirmation needed
+      }
+
+      if (!data.user || !data.session) {
+        throw new AuthError('Failed to create account');
+      }
+
+      // User is authenticated immediately (email confirmation disabled)
+      return this.buildUserFromSession(data.user);
+    } catch (err: any) {
+      console.error('Signup failed:', err);
+      throw err;
     }
-
-    if (!data.user) {
-      throw new AuthError('Failed to create account');
-    }
-
-    return this.buildUserFromSession(data.user);
   }
 
   /**

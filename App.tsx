@@ -508,10 +508,17 @@ const AppContent: React.FC = () => {
   // Auth handlers
   const handleSignUp = useCallback(async (credentials: SignUpCredentials) => {
     try {
-      await supabaseService.signUp(credentials);
-      // Auth state change listener will handle the rest
-      setIsAuthModalOpen(false);
-      addToast('🎉 Account created successfully! Welcome to Vismyras!', 'success', 5000);
+      const result = await supabaseService.signUp(credentials);
+      
+      if (result === null) {
+        // Email confirmation required
+        setIsAuthModalOpen(false);
+        addToast('📧 Please check your email to confirm your account!', 'info', 8000);
+      } else {
+        // User authenticated immediately
+        setIsAuthModalOpen(false);
+        addToast('🎉 Account created successfully! Welcome to Vismyras!', 'success', 5000);
+      }
     } catch (err) {
       if (err instanceof AuthError) {
         throw err;
