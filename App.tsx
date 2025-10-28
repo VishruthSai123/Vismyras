@@ -557,33 +557,69 @@ const AppContent: React.FC = () => {
     if (!user?.auth?.id || outfitHistory.length === 0) return;
     
     try {
-      const modelBlob = await db.getImage(modelImageId);
-      if (!modelBlob) return;
-      
-      const modelUrl = URL.createObjectURL(modelBlob);
+      // Get the current layer (final result with all garments)
       const currentLayer = outfitHistory[currentOutfitIndex];
-      const finalImageId = currentLayer?.poseImages?.[POSE_INSTRUCTIONS[currentPoseIndex]];
-      
-      let finalImageUrl = null;
-      if (finalImageId) {
-        const finalBlob = await db.getImage(finalImageId);
-        if (finalBlob) finalImageUrl = URL.createObjectURL(finalBlob);
+      if (!currentLayer) {
+        console.log('❌ No current layer found at index:', currentOutfitIndex);
+        return;
       }
+
+      // Get the final generated image (the complete outfit)
+      const finalImageId = currentLayer?.poseImages?.[POSE_INSTRUCTIONS[currentPoseIndex]];
+      if (!finalImageId) {
+        console.log('❌ No final image to save yet. Current layer:', currentLayer);
+        console.log('Available pose images:', currentLayer?.poseImages);
+        console.log('Looking for pose:', POSE_INSTRUCTIONS[currentPoseIndex]);
+        return;
+      }
+
+      console.log('📸 Saving outfit with final image ID:', finalImageId);
+      console.log('📚 Total layers in outfit:', outfitHistory.length);
+      console.log('📍 Current index:', currentOutfitIndex);
+
+      // Convert final image blob to base64 data URL (permanent)
+      const finalBlob = await db.getImage(finalImageId);
+      if (!finalBlob) {
+        console.log('❌ Final image blob not found in IndexedDB');
+        return;
+      }
+
+      const finalImageDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(finalBlob);
+      });
+
+      // Get model image as base64 too
+      const modelBlob = await db.getImage(modelImageId);
+      let modelImageDataUrl = '';
+      if (modelBlob) {
+        modelImageDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(modelBlob);
+        });
+      }
+
+      // Save ALL layers up to current index (the complete stack)
+      const completeStack = outfitHistory.slice(0, currentOutfitIndex + 1);
 
       await supabaseService.saveOutfit({
         user_id: user.auth.id,
-        outfit_name: `Outfit ${new Date().toLocaleDateString()}`,
-        model_image_url: modelUrl,
+        outfit_name: `Outfit ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+        model_image_url: modelImageDataUrl, // Base64 data URL
         model_image_id: modelImageId,
-        garment_layers: outfitHistory,
-        final_image_url: finalImageUrl,
+        garment_layers: completeStack, // Save complete stack
+        final_image_url: finalImageDataUrl, // Base64 data URL - the complete final image
         final_image_id: finalImageId,
         pose_variation: POSE_INSTRUCTIONS[currentPoseIndex],
       });
       
-      console.log('Outfit saved successfully');
+      console.log('✅ Outfit saved successfully!');
+      console.log('   - Final image size:', Math.round(finalImageDataUrl.length / 1024), 'KB');
+      console.log('   - Layers saved:', completeStack.length);
     } catch (err) {
-      console.error('Failed to save outfit:', err);
+      console.error('❌ Failed to save outfit:', err);
       // Silent fail - don't interrupt user workflow
     }
   }, [user, outfitHistory, currentOutfitIndex, modelImageId, currentPoseIndex]);
