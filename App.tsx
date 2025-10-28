@@ -124,16 +124,13 @@ const AppContent: React.FC = () => {
     supabaseService.initialize();
 
     let mounted = true;
-    let initialLoadComplete = false;
+    let authEventProcessed = false;
 
     // Set timeout to force auth loading completion
     const authTimeout = setTimeout(() => {
       if (mounted && isAuthLoading) {
         console.log('⏰ Auth loading timeout - forcing completion');
         setIsAuthLoading(false);
-        setTimeout(() => {
-          initialLoadComplete = true;
-        }, 100);
       }
     }, 2000); // 2 second timeout
 
@@ -162,10 +159,6 @@ const AppContent: React.FC = () => {
           console.log('✅ Auth loading complete, setting isAuthLoading = false');
           clearTimeout(authTimeout);
           setIsAuthLoading(false);
-          // Delay setting initialLoadComplete to allow INITIAL_SESSION event to process
-          setTimeout(() => {
-            initialLoadComplete = true;
-          }, 100);
         }
       }
     };
@@ -176,21 +169,9 @@ const AppContent: React.FC = () => {
     const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
       if (!mounted) return;
 
-      // Allow INITIAL_SESSION to process during startup
-      if (!initialLoadComplete) {
-        console.log('⏭️ Processing initial auth event');
-        // Update user if auth event provides one and we don't have it yet
-        if (newUser) {
-          setUser(newUser);
-          billingService.setCurrentUser(newUser.auth.id);
-          billingService.loadFromSupabase(newUser.billing);
-          refreshUsageStats();
-        }
-        return;
-      }
-
-      console.log('🔄 Auth state changed:', newUser ? `User: ${newUser.profile.email}` : 'Logged out');
+      console.log('🔄 Auth state event:', newUser ? `User: ${newUser.profile.email}` : 'Logged out');
       
+      // Always process auth state changes
       setUser(newUser);
       
       if (newUser) {
@@ -198,12 +179,17 @@ const AppContent: React.FC = () => {
         billingService.loadFromSupabase(newUser.billing);
         refreshUsageStats();
         
-        // Show welcome toast on new login
-        addToast(`Welcome back, ${newUser.profile.full_name || 'User'}! 👋`, 'success', 3000);
+        // Show welcome toast only on subsequent logins (not initial load)
+        if (authEventProcessed) {
+          addToast(`Welcome back, ${newUser.profile.full_name || 'User'}! 👋`, 'success', 3000);
+        }
+        
+        authEventProcessed = true;
       } else {
         billingService.setCurrentUser(null);
         billingService.resetBilling();
         refreshUsageStats();
+        authEventProcessed = true;
       }
     });
 
