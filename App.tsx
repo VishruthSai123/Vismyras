@@ -148,6 +148,7 @@ const AppContent: React.FC = () => {
         setUser(null);
       } finally {
         if (mounted) {
+          console.log('✅ Auth loading complete, setting isAuthLoading = false');
           setIsAuthLoading(false);
           // Delay setting initialLoadComplete to allow INITIAL_SESSION event to process
           setTimeout(() => {
@@ -202,10 +203,12 @@ const AppContent: React.FC = () => {
 
   // Effect to load state from localStorage and IndexedDB on initial mount
   useEffect(() => {
+    console.log('🔍 State loading effect triggered. isAuthLoading:', isAuthLoading);
     if (isAuthLoading) return; // Wait for auth to finish loading
 
     const loadState = async () => {
       try {
+        console.log('📦 Loading saved state...');
         await db.init();
         const savedModelId = JSON.parse(localStorage.getItem('vismyras_modelImageId') || 'null');
         
@@ -231,6 +234,7 @@ const AppContent: React.FC = () => {
         console.error("❌ Failed to load saved state:", e);
         // If loading fails, start fresh but don't clear user auth
       } finally {
+        console.log('✅ State loading complete, setting isStateLoaded = true');
         setIsStateLoaded(true);
       }
     };
@@ -719,6 +723,7 @@ const AppContent: React.FC = () => {
   };
 
   if (!isStateLoaded || isAuthLoading) {
+    console.log('⏸️ Showing loading screen. isStateLoaded:', isStateLoaded, 'isAuthLoading:', isAuthLoading);
     return (
         <div className="w-screen h-screen flex flex-col items-center justify-center bg-gray-50">
             <Spinner />
