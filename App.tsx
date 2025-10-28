@@ -123,6 +123,7 @@ const AppContent: React.FC = () => {
     supabaseService.initialize();
 
     let mounted = true;
+    let initialLoadComplete = false;
 
     const loadAuth = async () => {
       try {
@@ -139,11 +140,14 @@ const AppContent: React.FC = () => {
           refreshUsageStats();
         } else {
           console.log('❌ No authenticated user');
+          setUser(null);
         }
       } catch (err) {
         console.error('❌ Error loading auth state:', err);
+        setUser(null);
       } finally {
         if (mounted) {
+          initialLoadComplete = true;
           setIsAuthLoading(false);
         }
       }
@@ -155,7 +159,13 @@ const AppContent: React.FC = () => {
     const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
       if (!mounted) return;
 
-      console.log('🔄 Auth state changed:', newUser ? 'User logged in' : 'User logged out');
+      // Only process auth changes after initial load
+      if (!initialLoadComplete) {
+        console.log('⏭️ Skipping auth change during initial load');
+        return;
+      }
+
+      console.log('🔄 Auth state changed:', newUser ? `User: ${newUser.profile.email}` : 'Logged out');
       
       setUser(newUser);
       
@@ -164,10 +174,8 @@ const AppContent: React.FC = () => {
         billingService.loadFromSupabase(newUser.billing);
         refreshUsageStats();
         
-        // Only show welcome toast if this is a new login (not initial load)
-        if (!isAuthLoading) {
-          addToast(`Welcome back, ${newUser.profile.full_name || 'User'}! 👋`, 'success', 3000);
-        }
+        // Show welcome toast on new login
+        addToast(`Welcome back, ${newUser.profile.full_name || 'User'}! 👋`, 'success', 3000);
       } else {
         billingService.setCurrentUser(null);
         billingService.resetBilling();

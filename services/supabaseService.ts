@@ -249,26 +249,56 @@ class SupabaseService {
    */
   public onAuthStateChange(callback: (user: VismyrasUser | null) => void): () => void {
     const client = this.getClient();
+    let lastUserId: string | null = null;
 
     const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 Auth event:', event, 'Session:', session ? 'exists' : 'null');
+      console.log('🔐 Auth event:', event, 'Session:', session ? 'exists' : 'null', 'User ID:', session?.user?.id);
 
-      // Ignore initial session load if we already have user
-      if (event === 'INITIAL_SESSION' && !session) {
+      // Handle different auth events
+      if (event === 'INITIAL_SESSION') {
+        // On page load, restore session if it exists
+        if (session?.user) {
+          console.log('🔄 Restoring session for user:', session.user.email);
+          lastUserId = session.user.id;
+          
+          try {
+            let profile: UserProfile;
+            const existingProfile = await this.getUserProfile(session.user.id).catch(() => null);
+
+            if (existingProfile) {
+              profile = existingProfile;
+            } else {
+              const provider = session.user.app_metadata.provider || 'email';
+              profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
+            }
+
+            const billing = await this.loadUserBilling(session.user.id);
+
+            callback({
+              auth: session.user,
+              profile,
+              billing,
+            });
+          } catch (err) {
+            console.error('❌ Error restoring session:', err);
+          }
+        }
+        // Don't call callback with null on INITIAL_SESSION without session
+        // This prevents logout on page refresh
         return;
       }
 
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('✅ User signed in:', session.user.email);
+        lastUserId = session.user.id;
+        
         try {
           let profile: UserProfile;
-
-          // Check if profile exists
           const existingProfile = await this.getUserProfile(session.user.id).catch(() => null);
 
           if (existingProfile) {
             profile = existingProfile;
           } else {
-            // Create profile for OAuth users
             const provider = session.user.app_metadata.provider || 'email';
             profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
           }
@@ -281,15 +311,32 @@ class SupabaseService {
             billing,
           });
         } catch (err) {
-          console.error('Error handling auth state change:', err);
-          // Don't call callback with null - keep existing session
+          console.error('❌ Error handling sign in:', err);
+        }
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        console.log('🔄 Token refreshed for user:', session.user.email);
+        // Only update if user hasn't changed
+        if (lastUserId === session.user.id) {
+          try {
+            const profile = await this.getUserProfile(session.user.id);
+            const billing = await this.loadUserBilling(session.user.id);
+
+            callback({
+              auth: session.user,
+              profile,
+              billing,
+            });
+          } catch (err) {
+            console.error('❌ Error refreshing token:', err);
+          }
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('🚪 User signed out');
+        lastUserId = null;
         billingService.resetBilling();
         callback(null);
       } else if (event === 'USER_UPDATED' && session?.user) {
-        // User data updated, refresh
+        console.log('🔄 User data updated');
         try {
           const profile = await this.getUserProfile(session.user.id);
           const billing = await this.loadUserBilling(session.user.id);
@@ -300,7 +347,7 @@ class SupabaseService {
             billing,
           });
         } catch (err) {
-          console.error('Error updating user data:', err);
+          console.error('❌ Error updating user:', err);
         }
       }
     });
