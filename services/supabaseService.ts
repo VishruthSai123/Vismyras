@@ -44,6 +44,9 @@ class SupabaseService {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: 'vismyras-auth-token',
+        flowType: 'pkce',
       },
     });
 
@@ -175,14 +178,29 @@ class SupabaseService {
   public async getSession(): Promise<Session | null> {
     const client = this.getClient();
 
-    const { data, error } = await client.auth.getSession();
+    try {
+      const { data, error } = await client.auth.getSession();
 
-    if (error) {
-      console.error('Error getting session:', error);
+      if (error) {
+        console.error('❌ Error getting session:', error);
+        
+        // Try to refresh session
+        const { data: refreshData, error: refreshError } = await client.auth.refreshSession();
+        
+        if (refreshError) {
+          console.error('❌ Failed to refresh session:', refreshError);
+          return null;
+        }
+        
+        console.log('✅ Session refreshed successfully');
+        return refreshData.session;
+      }
+
+      return data.session;
+    } catch (err) {
+      console.error('❌ Session error:', err);
       return null;
     }
-
-    return data.session;
   }
 
   /**
@@ -191,13 +209,27 @@ class SupabaseService {
   public async getCurrentUser(): Promise<VismyrasUser | null> {
     const client = this.getClient();
 
-    const { data: { user }, error } = await client.auth.getUser();
-
-    if (error || !user) {
-      return null;
-    }
-
     try {
+      // First check session
+      const { data: { session }, error: sessionError } = await client.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        return null;
+      }
+
+      if (!session?.user) {
+        return null;
+      }
+
+      // Get fresh user data
+      const { data: { user }, error: userError } = await client.auth.getUser();
+
+      if (userError || !user) {
+        console.error('User error:', userError);
+        return null;
+      }
+
       const profile = await this.getUserProfile(user.id);
       const billing = await this.loadUserBilling(user.id);
 
@@ -219,9 +251,14 @@ class SupabaseService {
     const client = this.getClient();
 
     const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('🔐 Auth event:', event, 'Session:', session ? 'exists' : 'null');
 
-      if (event === 'SIGNED_IN' && session?.user) {
+      // Ignore initial session load if we already have user
+      if (event === 'INITIAL_SESSION' && !session) {
+        return;
+      }
+
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
         try {
           let profile: UserProfile;
 
@@ -245,11 +282,26 @@ class SupabaseService {
           });
         } catch (err) {
           console.error('Error handling auth state change:', err);
-          callback(null);
+          // Don't call callback with null - keep existing session
         }
       } else if (event === 'SIGNED_OUT') {
+        console.log('🚪 User signed out');
         billingService.resetBilling();
         callback(null);
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        // User data updated, refresh
+        try {
+          const profile = await this.getUserProfile(session.user.id);
+          const billing = await this.loadUserBilling(session.user.id);
+          
+          callback({
+            auth: session.user,
+            profile,
+            billing,
+          });
+        } catch (err) {
+          console.error('Error updating user data:', err);
+        }
       }
     });
 

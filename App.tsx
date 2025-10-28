@@ -122,20 +122,30 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     supabaseService.initialize();
 
+    let mounted = true;
+
     const loadAuth = async () => {
       try {
+        console.log('🔄 Loading auth state...');
         const currentUser = await supabaseService.getCurrentUser();
+        
+        if (!mounted) return;
+
         if (currentUser) {
+          console.log('✅ User authenticated:', currentUser.profile.email);
           setUser(currentUser);
           billingService.setCurrentUser(currentUser.auth.id);
           billingService.loadFromSupabase(currentUser.billing);
           refreshUsageStats();
-          addToast(`Welcome back, ${currentUser.profile.full_name || 'User'}! 👋`, 'success', 4000);
+        } else {
+          console.log('❌ No authenticated user');
         }
       } catch (err) {
-        console.error('Error loading auth state:', err);
+        console.error('❌ Error loading auth state:', err);
       } finally {
-        setIsAuthLoading(false);
+        if (mounted) {
+          setIsAuthLoading(false);
+        }
       }
     };
 
@@ -143,56 +153,71 @@ const AppContent: React.FC = () => {
 
     // Subscribe to auth state changes
     const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
+      if (!mounted) return;
+
+      console.log('🔄 Auth state changed:', newUser ? 'User logged in' : 'User logged out');
+      
       setUser(newUser);
+      
       if (newUser) {
         billingService.setCurrentUser(newUser.auth.id);
         billingService.loadFromSupabase(newUser.billing);
         refreshUsageStats();
+        
+        // Only show welcome toast if this is a new login (not initial load)
+        if (!isAuthLoading) {
+          addToast(`Welcome back, ${newUser.profile.full_name || 'User'}! 👋`, 'success', 3000);
+        }
       } else {
         billingService.setCurrentUser(null);
+        billingService.resetBilling();
+        refreshUsageStats();
       }
     });
 
     return () => {
+      mounted = false;
       unsubscribe();
     };
-  }, []);
+  }, []); // Only run once on mount
 
   // Effect to load state from localStorage and IndexedDB on initial mount
   useEffect(() => {
+    if (isAuthLoading) return; // Wait for auth to finish loading
+
     const loadState = async () => {
       try {
         await db.init();
         const savedModelId = JSON.parse(localStorage.getItem('vismyras_modelImageId') || 'null');
+        
         if (savedModelId) {
+            console.log('🔄 Restoring saved session...');
             setModelImageId(savedModelId);
             const savedHistory = JSON.parse(localStorage.getItem('vismyras_outfitHistory') || '[]');
             setOutfitHistory(savedHistory);
             setCurrentOutfitIndex(JSON.parse(localStorage.getItem('vismyras_currentOutfitIndex') || '0'));
             setWardrobe(JSON.parse(localStorage.getItem('vismyras_wardrobe') || JSON.stringify(defaultWardrobe)));
             setSavedOutfits(JSON.parse(localStorage.getItem('vismyras_savedOutfits') || '[]'));
+            
             if (user) {
-              addToast('Welcome back! Your session has been restored. 👋', 'info', 4000);
+              addToast('Session restored! 👋', 'info', 3000);
             }
         } else {
             if (!user) {
-              // Show auth prompt for new users
-              setIsAuthModalOpen(true);
+              // Only show auth modal for new users with no saved state
+              console.log('👋 New user - showing auth modal');
             }
         }
       } catch (e) {
-        console.error("Failed to load saved state:", e);
-        // If loading fails, start fresh
-        handleStartOver();
+        console.error("❌ Failed to load saved state:", e);
+        // If loading fails, start fresh but don't clear user auth
       } finally {
         setIsStateLoaded(true);
       }
     };
     
-    if (!isAuthLoading) {
-      loadState();
-    }
-  }, [isAuthLoading, user]);
+    loadState();
+  }, [isAuthLoading]); // Depend only on isAuthLoading
 
   // Effect to save state to localStorage whenever it changes
   useEffect(() => {
