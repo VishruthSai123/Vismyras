@@ -1,0 +1,4 @@
+/*
+ * This file ensures proper routing for Single Page Applications (SPA) on Vercel
+ * It redirects all routes to index.html to prevent 404 errors
+ */
