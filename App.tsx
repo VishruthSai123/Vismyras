@@ -660,11 +660,17 @@ const AppContent: React.FC = () => {
         {/* Main App */}
         <Route path="/" element={
           showStylesScreen ? (
-            <YourStyles 
-              onBack={() => setShowStylesScreen(false)} 
-              onRestoreOutfit={handleRestoreOutfit}
-              userId={user?.auth?.id || ''}
-            />
+            user ? (
+              <YourStyles 
+                user={user}
+                onBack={() => setShowStylesScreen(false)} 
+                onRestoreOutfit={handleRestoreOutfit}
+              />
+            ) : (
+              <div className="w-screen h-screen flex items-center justify-center">
+                <p className="text-gray-600">Please sign in to view your styles</p>
+              </div>
+            )
           ) : showUsageScreen ? (
             <UsageScreen onBack={() => setShowUsageScreen(false)} />
           ) : (
