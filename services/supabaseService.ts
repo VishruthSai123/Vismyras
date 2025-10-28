@@ -266,21 +266,21 @@ class SupabaseService {
   }
 
   /**
-   * Get outfit history
+   * Get outfit history with count
    */
   public async getOutfitHistory(
     userId: string,
     filters?: OutfitHistoryFilters
-  ): Promise<UserOutfit[]> {
+  ): Promise<{ outfits: UserOutfit[]; total: number }> {
     const client = this.getClient();
 
     let query = client
       .from('user_outfit_history')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('user_id', userId);
 
-    if (filters?.is_favorite !== undefined) {
-      query = query.eq('is_favorite', filters.is_favorite);
+    if (filters?.favorites_only) {
+      query = query.eq('is_favorite', true);
     }
 
     if (filters?.search) {
@@ -301,13 +301,16 @@ class SupabaseService {
       query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       throw new Error('Failed to fetch outfit history');
     }
 
-    return data || [];
+    return {
+      outfits: data || [],
+      total: count || 0,
+    };
   }
 
   /**
@@ -361,7 +364,7 @@ class SupabaseService {
   /**
    * Delete outfit
    */
-  public async deleteOutfit(outfitId: string, userId: string): Promise<void> {
+  public async deleteOutfit(userId: string, outfitId: string): Promise<void> {
     const client = this.getClient();
 
     const { error } = await client
@@ -376,18 +379,30 @@ class SupabaseService {
   }
 
   /**
-   * Toggle favorite
+   * Toggle favorite status
    */
   public async toggleFavorite(
-    outfitId: string,
     userId: string,
-    isFavorite: boolean
+    outfitId: string
   ): Promise<UserOutfit> {
     const client = this.getClient();
 
+    // Get current status
+    const { data: current, error: fetchError } = await client
+      .from('user_outfit_history')
+      .select('is_favorite')
+      .eq('id', outfitId)
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError) {
+      throw new Error('Failed to fetch outfit');
+    }
+
+    // Toggle it
     const { data, error } = await client
       .from('user_outfit_history')
-      .update({ is_favorite: isFavorite })
+      .update({ is_favorite: !current.is_favorite })
       .eq('id', outfitId)
       .eq('user_id', userId)
       .select()
@@ -410,6 +425,81 @@ class SupabaseService {
       outfit_id: outfitId,
       requesting_user_id: userId,
     });
+  }
+
+  // ==================== STORAGE METHODS ====================
+
+  /**
+   * Upload image to storage bucket
+   */
+  public async uploadImage(
+    bucket: 'model-images' | 'garment-images' | 'final-outputs',
+    userId: string,
+    file: Blob,
+    filename: string
+  ): Promise<{ url: string; path: string }> {
+    const client = this.getClient();
+
+    const path = `${userId}/${Date.now()}-${filename}`;
+
+    const { data, error } = await client.storage
+      .from(bucket)
+      .upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (error) {
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
+
+    const { data: urlData } = client.storage
+      .from(bucket)
+      .getPublicUrl(path);
+
+    return {
+      url: urlData.publicUrl,
+      path: path,
+    };
+  }
+
+  /**
+   * Delete image from storage
+   */
+  public async deleteImage(
+    bucket: 'model-images' | 'garment-images' | 'final-outputs',
+    path: string
+  ): Promise<void> {
+    const client = this.getClient();
+
+    const { error } = await client.storage
+      .from(bucket)
+      .remove([path]);
+
+    if (error) {
+      throw new Error(`Failed to delete image: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get signed URL for private image
+   */
+  public async getSignedUrl(
+    bucket: 'model-images' | 'garment-images' | 'final-outputs',
+    path: string,
+    expiresIn: number = 3600
+  ): Promise<string> {
+    const client = this.getClient();
+
+    const { data, error } = await client.storage
+      .from(bucket)
+      .createSignedUrl(path, expiresIn);
+
+    if (error) {
+      throw new Error(`Failed to get signed URL: ${error.message}`);
+    }
+
+    return data.signedUrl;
   }
 }
 

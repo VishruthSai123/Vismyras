@@ -68,6 +68,7 @@ export interface OutfitCollection {
  * Parameters for saving a new outfit
  */
 export interface SaveOutfitParams {
+  user_id: string;
   outfit_name?: string;
   description?: string;
   tags?: string[];

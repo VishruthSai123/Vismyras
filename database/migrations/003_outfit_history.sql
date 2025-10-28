@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS user_outfit_history (
     -- Model and outfit data
     model_image_url TEXT NOT NULL, -- URL to the base model image
     model_image_id VARCHAR(255), -- ID for IndexedDB if needed
+    model_image_path TEXT, -- Storage path for cleanup
     
     -- Garment layers (JSON array of applied garments)
     garment_layers JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS user_outfit_history (
     -- Final result
     final_image_url TEXT, -- URL to the final generated outfit image
     final_image_id VARCHAR(255), -- ID for IndexedDB
+    final_image_path TEXT, -- Storage path for cleanup
     
     -- Pose and settings
     pose_variation VARCHAR(100),
@@ -45,11 +47,11 @@ CREATE TABLE IF NOT EXISTS user_outfit_history (
     CONSTRAINT outfit_history_user_id_idx CHECK (user_id IS NOT NULL)
 );
 
--- Create indexes for better query performance
-CREATE INDEX idx_outfit_history_user_id ON user_outfit_history(user_id);
-CREATE INDEX idx_outfit_history_created_at ON user_outfit_history(created_at DESC);
-CREATE INDEX idx_outfit_history_favorite ON user_outfit_history(user_id, is_favorite) WHERE is_favorite = TRUE;
-CREATE INDEX idx_outfit_history_tags ON user_outfit_history USING GIN(tags);
+-- Create indexes for better query performance (idempotent)
+CREATE INDEX IF NOT EXISTS idx_outfit_history_user_id ON user_outfit_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_outfit_history_created_at ON user_outfit_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_outfit_history_favorite ON user_outfit_history(user_id, is_favorite) WHERE is_favorite = TRUE;
+CREATE INDEX IF NOT EXISTS idx_outfit_history_tags ON user_outfit_history USING GIN(tags);
 
 -- Table: user_wardrobe_items
 -- Stores custom wardrobe items uploaded by users
@@ -80,9 +82,9 @@ CREATE TABLE IF NOT EXISTS user_wardrobe_items (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_wardrobe_user_id ON user_wardrobe_items(user_id);
-CREATE INDEX idx_wardrobe_category ON user_wardrobe_items(user_id, category);
-CREATE INDEX idx_wardrobe_favorite ON user_wardrobe_items(user_id, is_favorite) WHERE is_favorite = TRUE;
+CREATE INDEX IF NOT EXISTS idx_wardrobe_user_id ON user_wardrobe_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_wardrobe_category ON user_wardrobe_items(user_id, category);
+CREATE INDEX IF NOT EXISTS idx_wardrobe_favorite ON user_wardrobe_items(user_id, is_favorite) WHERE is_favorite = TRUE;
 
 -- Table: outfit_collections
 -- Allows users to organize outfits into collections/albums
@@ -100,7 +102,7 @@ CREATE TABLE IF NOT EXISTS outfit_collections (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_collections_user_id ON outfit_collections(user_id);
+CREATE INDEX IF NOT EXISTS idx_collections_user_id ON outfit_collections(user_id);
 
 -- Junction table: Link outfits to collections
 CREATE TABLE IF NOT EXISTS outfit_collection_items (
@@ -114,8 +116,8 @@ CREATE TABLE IF NOT EXISTS outfit_collection_items (
     UNIQUE(collection_id, outfit_id)
 );
 
-CREATE INDEX idx_collection_items_collection ON outfit_collection_items(collection_id);
-CREATE INDEX idx_collection_items_outfit ON outfit_collection_items(outfit_id);
+CREATE INDEX IF NOT EXISTS idx_collection_items_collection ON outfit_collection_items(collection_id);
+CREATE INDEX IF NOT EXISTS idx_collection_items_outfit ON outfit_collection_items(outfit_id);
 
 -- Function: Update updated_at timestamp automatically
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -126,17 +128,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Triggers for auto-updating updated_at
+-- Triggers for auto-updating updated_at (idempotent)
+DROP TRIGGER IF EXISTS update_outfit_history_updated_at ON user_outfit_history;
 CREATE TRIGGER update_outfit_history_updated_at
     BEFORE UPDATE ON user_outfit_history
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_wardrobe_items_updated_at ON user_wardrobe_items;
 CREATE TRIGGER update_wardrobe_items_updated_at
     BEFORE UPDATE ON user_wardrobe_items
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_collections_updated_at ON outfit_collections;
 CREATE TRIGGER update_collections_updated_at
     BEFORE UPDATE ON outfit_collections
     FOR EACH ROW
@@ -148,45 +153,55 @@ ALTER TABLE user_wardrobe_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outfit_collections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outfit_collection_items ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can only see their own outfit history
+-- Policy: Users can only see their own outfit history (idempotent)
+DROP POLICY IF EXISTS "Users can view own outfit history" ON user_outfit_history;
 CREATE POLICY "Users can view own outfit history"
     ON user_outfit_history FOR SELECT
     USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own outfit history" ON user_outfit_history;
 CREATE POLICY "Users can insert own outfit history"
     ON user_outfit_history FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own outfit history" ON user_outfit_history;
 CREATE POLICY "Users can update own outfit history"
     ON user_outfit_history FOR UPDATE
     USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own outfit history" ON user_outfit_history;
 CREATE POLICY "Users can delete own outfit history"
     ON user_outfit_history FOR DELETE
     USING (auth.uid() = user_id);
 
--- Policy: Users can only see their own wardrobe
+-- Policy: Users can only see their own wardrobe (idempotent)
+DROP POLICY IF EXISTS "Users can view own wardrobe" ON user_wardrobe_items;
 CREATE POLICY "Users can view own wardrobe"
     ON user_wardrobe_items FOR SELECT
     USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own wardrobe items" ON user_wardrobe_items;
 CREATE POLICY "Users can insert own wardrobe items"
     ON user_wardrobe_items FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own wardrobe items" ON user_wardrobe_items;
 CREATE POLICY "Users can update own wardrobe items"
     ON user_wardrobe_items FOR UPDATE
     USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own wardrobe items" ON user_wardrobe_items;
 CREATE POLICY "Users can delete own wardrobe items"
     ON user_wardrobe_items FOR DELETE
     USING (auth.uid() = user_id);
 
--- Policy: Users can manage their own collections
+-- Policy: Users can manage their own collections (idempotent)
+DROP POLICY IF EXISTS "Users can manage own collections" ON outfit_collections;
 CREATE POLICY "Users can manage own collections"
     ON outfit_collections FOR ALL
     USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can manage own collection items" ON outfit_collection_items;
 CREATE POLICY "Users can manage own collection items"
     ON outfit_collection_items FOR ALL
     USING (
