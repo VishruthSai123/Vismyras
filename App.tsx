@@ -570,7 +570,8 @@ const AppContent: React.FC = () => {
         if (finalBlob) finalImageUrl = URL.createObjectURL(finalBlob);
       }
 
-      await supabaseService.saveOutfit(user.auth.id, {
+      await supabaseService.saveOutfit({
+        user_id: user.auth.id,
         outfit_name: `Outfit ${new Date().toLocaleDateString()}`,
         model_image_url: modelUrl,
         model_image_id: modelImageId,
@@ -579,7 +580,10 @@ const AppContent: React.FC = () => {
         final_image_id: finalImageId,
         pose_variation: POSE_INSTRUCTIONS[currentPoseIndex],
       });
+      
+      console.log('Outfit saved successfully');
     } catch (err) {
+      console.error('Failed to save outfit:', err);
       // Silent fail - don't interrupt user workflow
     }
   }, [user, outfitHistory, currentOutfitIndex, modelImageId, currentPoseIndex]);
