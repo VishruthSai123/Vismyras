@@ -126,6 +126,17 @@ const AppContent: React.FC = () => {
     let mounted = true;
     let initialLoadComplete = false;
 
+    // Set timeout to force auth loading completion
+    const authTimeout = setTimeout(() => {
+      if (mounted && isAuthLoading) {
+        console.log('⏰ Auth loading timeout - forcing completion');
+        setIsAuthLoading(false);
+        setTimeout(() => {
+          initialLoadComplete = true;
+        }, 100);
+      }
+    }, 2000); // 2 second timeout
+
     const loadAuth = async () => {
       try {
         console.log('🔄 Loading auth state...');
@@ -149,6 +160,7 @@ const AppContent: React.FC = () => {
       } finally {
         if (mounted) {
           console.log('✅ Auth loading complete, setting isAuthLoading = false');
+          clearTimeout(authTimeout);
           setIsAuthLoading(false);
           // Delay setting initialLoadComplete to allow INITIAL_SESSION event to process
           setTimeout(() => {
@@ -197,6 +209,7 @@ const AppContent: React.FC = () => {
 
     return () => {
       mounted = false;
+      clearTimeout(authTimeout);
       unsubscribe();
     };
   }, []); // Only run once on mount
