@@ -597,14 +597,32 @@ const AppContent: React.FC = () => {
 
   const handleLogout = useCallback(async () => {
     try {
+      console.log('🚪 Logging out...');
+      
+      // Clear all outfit workspace
+      handleStartOver();
+      
+      // Reset auth and billing
       await supabaseService.logout();
       setUser(null);
       billingService.setCurrentUser(null);
       billingService.resetBilling();
       refreshUsageStats();
-      handleStartOver(); // Clear all app state
-      addToast('Logged out successfully', 'info', 3000);
+      
+      // Close usage screen if open
+      setShowUsageScreen(false);
+      
+      // Clear all localStorage except auth token (Supabase handles that)
+      localStorage.removeItem('vismyras_modelImageId');
+      localStorage.removeItem('vismyras_outfitHistory');
+      localStorage.removeItem('vismyras_currentOutfitIndex');
+      localStorage.removeItem('vismyras_wardrobe');
+      localStorage.removeItem('vismyras_savedOutfits');
+      
+      console.log('✅ Workspace cleared, navigating to home');
+      addToast('Logged out successfully. See you soon! 👋', 'info', 3000);
     } catch (err) {
+      console.error('❌ Logout error:', err);
       addToast('Failed to logout. Please try again.', 'error', 3000);
     }
   }, [addToast, refreshUsageStats]);
