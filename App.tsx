@@ -4,7 +4,7 @@
 */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import StartScreen from './components/StartScreen';
 import Canvas from './components/Canvas';
@@ -37,6 +37,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import RefundPolicy from './pages/RefundPolicy';
 import ContactUs from './pages/ContactUs';
+import UsageScreen from './pages/UsageScreen';
 
 const POSE_INSTRUCTIONS = [
   "Full frontal view, hands on hips",
@@ -68,7 +69,8 @@ const useMediaQuery = (query: string): boolean => {
   return matches;
 };
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const navigate = useNavigate();
   const [modelImageId, setModelImageId] = useState<string | null>(null);
   const [outfitHistory, setOutfitHistory] = useState<OutfitLayer[]>([]);
   const [currentOutfitIndex, setCurrentOutfitIndex] = useState<number>(0);
@@ -579,6 +581,10 @@ const App: React.FC = () => {
     setIsPaywallOpen(true);
   }, []);
 
+  const handleViewUsage = useCallback(() => {
+    navigate('/usage');
+  }, [navigate]);
+
 
   const viewVariants = {
     initial: { opacity: 0, y: 15 },
@@ -635,7 +641,7 @@ const App: React.FC = () => {
                   {/* User Menu Button (Top Right) */}
                   {user && (
                     <div className="absolute top-4 right-4 z-50">
-                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
+                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} />
                     </div>
                   )}
                   
@@ -708,7 +714,7 @@ const App: React.FC = () => {
                   {/* User Menu in Header (Top Right) */}
                   {user && (
                     <div className="absolute top-4 right-6 z-50">
-                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
+                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} />
                     </div>
                   )}
                   
@@ -828,9 +834,14 @@ const App: React.FC = () => {
             <Footer isOnDressingScreen={!!modelImageId} />
           </div>
         } />
+        <Route path="/usage" element={<UsageScreen onBack={() => navigate('/')} />} />
       </Routes>
     </Router>
   );
+};
+
+const App: React.FC = () => {
+  return <AppContent />;
 };
 
 export default App;
