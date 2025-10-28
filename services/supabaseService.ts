@@ -236,8 +236,23 @@ class SupabaseService {
         return null;
       }
 
-      const profile = await this.getUserProfile(user.id);
-      const billing = await this.loadUserBilling(user.id);
+      // Load profile and billing (with error handling)
+      let profile: UserProfile;
+      let billing: any;
+      
+      try {
+        profile = await this.getUserProfile(user.id);
+      } catch (err) {
+        console.warn('⚠️ Could not load profile, will be created on next login:', err);
+        return null; // Let auth state change handle profile creation
+      }
+      
+      try {
+        billing = await this.loadUserBilling(user.id);
+      } catch (err) {
+        console.warn('⚠️ Could not load billing, using defaults:', err);
+        billing = billingService.getUserBilling();
+      }
 
       return {
         auth: user,
@@ -478,20 +493,31 @@ class SupabaseService {
   private async loadUserBilling(userId: string): Promise<any> {
     const client = this.getClient();
 
-    const { data, error } = await client
-      .from('user_billing')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    try {
+      const { data, error } = await client
+        .from('user_billing')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
 
-    if (error || !data) {
-      // No billing data yet, return default
+      if (error) {
+        console.warn('⚠️ Could not load billing from Supabase:', error.message);
+        // Return default billing data
+        return billingService.getUserBilling();
+      }
+
+      if (!data) {
+        // No billing data yet, return default
+        return billingService.getUserBilling();
+      }
+
+      // Sync with billing service
+      billingService.loadFromSupabase(data.billing_data);
+      return billingService.getUserBilling();
+    } catch (err) {
+      console.warn('⚠️ Billing load failed, using defaults:', err);
       return billingService.getUserBilling();
     }
-
-    // Sync with billing service
-    billingService.loadFromSupabase(data.billing_data);
-    return billingService.getUserBilling();
   }
 
   /**
