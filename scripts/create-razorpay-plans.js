@@ -35,7 +35,7 @@ async function createPlans() {
       interval: 1,
       item: {
         name: 'Vismyras Premium Monthly',
-        description: '25 virtual try-ons per month with premium features',
+        description: '100 virtual try-ons per month with premium features',
         amount: 19900, // ₹199 in paise
         currency: 'INR',
       },

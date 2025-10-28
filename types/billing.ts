@@ -118,10 +118,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: SubscriptionTier.FREE,
     name: 'Free',
     price: 0,
-    monthlyLimit: 3,
+    monthlyLimit: 10,
     description: 'Perfect for trying out Vismyras',
     features: [
-      '3 try-ons per month',
+      '10 try-ons per month',
       'All clothing categories',
       'Basic pose variations',
       'Save outfits',
@@ -131,10 +131,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: SubscriptionTier.PREMIUM,
     name: 'Premium',
     price: 199,
-    monthlyLimit: 25,
+    monthlyLimit: 100,
     description: 'Best for fashion enthusiasts',
     features: [
-      '25 try-ons per month',
+      '100 try-ons per month',
       'All clothing categories',
       'Unlimited pose variations',
       'AI style editing',
@@ -147,15 +147,16 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
 /**
  * Pay-per-use pricing
  */
-export const PAY_PER_USE_PRICE = 29; // INR per try-on
+export const PAY_PER_USE_PRICE = 9; // INR per try-on (competitive with market)
 
 /**
  * One-time purchase options
+ * Market-competitive pricing: ₹9 base, discounts for bulk
  */
 export const ONE_TIME_PACKAGES = [
-  { tryOns: 1, price: 29, popular: false },
-  { tryOns: 5, price: 129, popular: true, savings: 16 }, // ₹26 per try-on (11% off)
-  { tryOns: 10, price: 249, popular: false, savings: 41 }, // ₹25 per try-on (14% off)
+  { tryOns: 10, price: 79, popular: false, savings: 11 }, // ₹8 per try-on (12% off)
+  { tryOns: 25, price: 179, popular: true, savings: 46 }, // ₹7 per try-on (22% off)
+  { tryOns: 50, price: 299, popular: false, savings: 151 }, // ₹6 per try-on (33% off)
 ];
 
 /**

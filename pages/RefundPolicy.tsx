@@ -102,7 +102,7 @@ const RefundPolicy: React.FC = () => {
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Free Tier</h2>
             <p className="text-gray-700">
-              The free tier (3 try-ons per month) is provided at no cost. No refunds are applicable to 
+              The free tier (10 try-ons per month) is provided at no cost. No refunds are applicable to 
               free service usage.
             </p>
           </section>
