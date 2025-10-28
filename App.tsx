@@ -70,7 +70,6 @@ const useMediaQuery = (query: string): boolean => {
 };
 
 const AppContent: React.FC = () => {
-  const navigate = useNavigate();
   const [modelImageId, setModelImageId] = useState<string | null>(null);
   const [outfitHistory, setOutfitHistory] = useState<OutfitLayer[]>([]);
   const [currentOutfitIndex, setCurrentOutfitIndex] = useState<number>(0);
@@ -581,9 +580,11 @@ const AppContent: React.FC = () => {
     setIsPaywallOpen(true);
   }, []);
 
+  const [showUsageScreen, setShowUsageScreen] = useState(false);
+
   const handleViewUsage = useCallback(() => {
-    navigate('/usage');
-  }, [navigate]);
+    setShowUsageScreen(true);
+  }, []);
 
 
   const viewVariants = {
@@ -614,6 +615,9 @@ const AppContent: React.FC = () => {
         
         {/* Main App */}
         <Route path="/" element={
+          showUsageScreen ? (
+            <UsageScreen onBack={() => setShowUsageScreen(false)} />
+          ) : (
           <div className="font-sans">
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
             
@@ -833,8 +837,8 @@ const AppContent: React.FC = () => {
             </AnimatePresence>
             <Footer isOnDressingScreen={!!modelImageId} />
           </div>
+          )
         } />
-        <Route path="/usage" element={<UsageScreen onBack={() => navigate('/')} />} />
       </Routes>
     </Router>
   );
