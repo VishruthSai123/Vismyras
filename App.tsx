@@ -185,17 +185,14 @@ const AppContent: React.FC = () => {
 
   // Effect to load state from localStorage and IndexedDB on initial mount
   useEffect(() => {
-    console.log('🔍 State loading effect triggered. isAuthLoading:', isAuthLoading);
     if (isAuthLoading) return; // Wait for auth to finish loading
 
     const loadState = async () => {
       try {
-        console.log('📦 Loading saved state...');
         await db.init();
         const savedModelId = JSON.parse(localStorage.getItem('vismyras_modelImageId') || 'null');
         
         if (savedModelId) {
-            console.log('🔄 Restoring saved session...');
             setModelImageId(savedModelId);
             const savedHistory = JSON.parse(localStorage.getItem('vismyras_outfitHistory') || '[]');
             setOutfitHistory(savedHistory);
@@ -206,17 +203,10 @@ const AppContent: React.FC = () => {
             if (user) {
               addToast('Session restored! 👋', 'info', 3000);
             }
-        } else {
-            if (!user) {
-              // Only show auth modal for new users with no saved state
-              console.log('👋 New user - showing auth modal');
-            }
         }
       } catch (e) {
-        console.error("❌ Failed to load saved state:", e);
         // If loading fails, start fresh but don't clear user auth
       } finally {
-        console.log('✅ State loading complete, setting isStateLoaded = true');
         setIsStateLoaded(true);
       }
     };
@@ -242,7 +232,6 @@ const AppContent: React.FC = () => {
         localStorage.setItem('vismyras_wardrobe', JSON.stringify(wardrobe));
         localStorage.setItem('vismyras_savedOutfits', JSON.stringify(savedOutfits));
     } catch (e) {
-        console.error("Failed to save state to localStorage:", e);
         setError("Could not save your session. Your browser's storage might be full.");
     }
   }, [isStateLoaded, modelImageId, outfitHistory, currentOutfitIndex, wardrobe, savedOutfits]);
@@ -624,18 +613,13 @@ const AppContent: React.FC = () => {
         final_image_id: finalImageId,
         pose_variation: POSE_INSTRUCTIONS[currentPoseIndex],
       });
-      
-      console.log('✅ Outfit auto-saved');
     } catch (err) {
-      console.error('Auto-save failed:', err);
       // Silent fail - don't interrupt user workflow
     }
   }, [user, outfitHistory, currentOutfitIndex, modelImageId, currentPoseIndex]);
 
   const handleLogout = useCallback(async () => {
     try {
-      console.log('🚪 Logging out...');
-      
       // Clear all outfit workspace
       handleStartOver();
       
@@ -657,10 +641,8 @@ const AppContent: React.FC = () => {
       localStorage.removeItem('vismyras_wardrobe');
       localStorage.removeItem('vismyras_savedOutfits');
       
-      console.log('✅ Workspace cleared, navigating to home');
       addToast('Logged out successfully. See you soon! 👋', 'info', 3000);
     } catch (err) {
-      console.error('❌ Logout error:', err);
       addToast('Failed to logout. Please try again.', 'error', 3000);
     }
   }, [addToast, refreshUsageStats]);
@@ -705,7 +687,6 @@ const AppContent: React.FC = () => {
   };
 
   if (!isStateLoaded || isAuthLoading) {
-    console.log('⏸️ Showing loading screen. isStateLoaded:', isStateLoaded, 'isAuthLoading:', isAuthLoading);
     return (
         <div className="w-screen h-screen flex flex-col items-center justify-center bg-gray-50">
             <Spinner />

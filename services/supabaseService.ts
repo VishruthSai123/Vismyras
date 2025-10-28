@@ -57,7 +57,6 @@ class SupabaseService {
     });
 
     this.initialized = true;
-    console.log('✅ Supabase client initialized');
   }
 
   /**
@@ -271,9 +270,18 @@ class SupabaseService {
   public onAuthStateChange(callback: (user: VismyrasUser | null) => void): () => void {
     const client = this.getClient();
     let lastUserId: string | null = null;
+    let lastEventTimestamp = 0;
 
     const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 Auth event:', event, 'Session:', session ? 'exists' : 'null', 'User ID:', session?.user?.id);
+      const now = Date.now();
+      const currentUserId = session?.user?.id || null;
+      
+      // Prevent duplicate events within 100ms for the same user
+      if (currentUserId === lastUserId && (now - lastEventTimestamp) < 100) {
+        return;
+      }
+      
+      lastEventTimestamp = now;
 
       // Handle different auth events
       if (event === 'INITIAL_SESSION') {
@@ -336,7 +344,6 @@ class SupabaseService {
           billing,
         });
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('🔄 Token refreshed for user:', session.user.email);
         // Only update if user hasn't changed
         if (lastUserId === session.user.id) {
           try {
@@ -346,7 +353,6 @@ class SupabaseService {
             try {
               billing = await this.loadUserBilling(session.user.id);
             } catch (err) {
-              console.warn('⚠️ Using default billing for token refresh');
               billing = billingService.getUserBilling();
             }
 
@@ -356,16 +362,13 @@ class SupabaseService {
               billing,
             });
           } catch (err) {
-            console.error('❌ Error refreshing token:', err);
           }
         }
       } else if (event === 'SIGNED_OUT') {
-        console.log('🚪 User signed out');
         lastUserId = null;
         billingService.resetBilling();
         callback(null);
       } else if (event === 'USER_UPDATED' && session?.user) {
-        console.log('🔄 User data updated');
         try {
           const profile = await this.getUserProfile(session.user.id);
           
@@ -373,7 +376,6 @@ class SupabaseService {
           try {
             billing = await this.loadUserBilling(session.user.id);
           } catch (err) {
-            console.warn('⚠️ Using default billing for user update');
             billing = billingService.getUserBilling();
           }
           
@@ -383,7 +385,6 @@ class SupabaseService {
             billing,
           });
         } catch (err) {
-          console.error('❌ Error updating user:', err);
         }
       }
     });
