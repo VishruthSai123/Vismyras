@@ -1,254 +1,236 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
-*/
-
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, Heart, Trash2, Eye, Calendar, Sparkles, 
-  Search, Filter, SortAsc, SortDesc, RefreshCw 
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Heart, Trash2, Search, Star } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
-import { UserOutfit, OutfitHistoryFilters } from '../types/outfitHistory';
+import type { UserOutfit, OutfitHistoryFilters } from '../types/outfitHistory';
+import type { VismyrasUser } from '../types/auth';
 
 interface YourStylesProps {
+  user: VismyrasUser;
   onBack: () => void;
   onRestoreOutfit: (outfit: UserOutfit) => void;
-  userId: string;
 }
 
-const YourStyles: React.FC<YourStylesProps> = ({ onBack, onRestoreOutfit, userId }) => {
+export default function YourStyles({ user, onBack, onRestoreOutfit }: YourStylesProps) {
   const [outfits, setOutfits] = useState<UserOutfit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<'created_at' | 'updated_at'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [total, setTotal] = useState(0);
 
+  // Load outfits
   const loadOutfits = async () => {
-    setLoading(true);
+    setIsLoading(true);
+    setError(null);
+
     try {
       const filters: OutfitHistoryFilters = {
         limit: 50,
+        sort_by: 'created_at',
+        sort_order: 'desc',
         favorites_only: showFavoritesOnly,
-        search: searchQuery || undefined,
-        sort_by: sortBy,
-        sort_order: sortOrder,
       };
 
-      const result = await supabaseService.getOutfitHistory(userId, filters);
+      if (searchTerm.trim()) {
+        filters.search = searchTerm.trim();
+      }
+
+      const result = await supabaseService.getOutfitHistory(user.auth.id, filters);
       setOutfits(result.outfits);
       setTotal(result.total);
-    } catch (error) {
-      console.error('Error loading outfits:', error);
+    } catch (err) {
+      setError('Failed to load your styles. Please try again.');
+      console.error('Error loading outfits:', err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  // Load on mount and when filters change
   useEffect(() => {
     loadOutfits();
-  }, [userId, showFavoritesOnly, sortBy, sortOrder]);
+  }, [showFavoritesOnly, searchTerm]);
 
-  const handleSearch = () => {
-    loadOutfits();
-  };
-
+  // Toggle favorite
   const handleToggleFavorite = async (outfitId: string) => {
     try {
-      await supabaseService.toggleFavorite(userId, outfitId);
-      loadOutfits();
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
+      await supabaseService.toggleFavorite(user.auth.id, outfitId);
+      // Update local state
+      setOutfits(prev =>
+        prev.map(o =>
+          o.id === outfitId ? { ...o, is_favorite: !o.is_favorite } : o
+        )
+      );
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
     }
   };
 
+  // Delete outfit
   const handleDelete = async (outfitId: string) => {
-    if (!confirm('Are you sure you want to delete this outfit? This action cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Delete this outfit? This cannot be undone.')) return;
 
     try {
-      await supabaseService.deleteOutfit(userId, outfitId);
-      loadOutfits();
-    } catch (error) {
-      console.error('Error deleting outfit:', error);
+      await supabaseService.deleteOutfit(user.auth.id, outfitId);
+      setOutfits(prev => prev.filter(o => o.id !== outfitId));
+      setTotal(prev => prev - 1);
+    } catch (err) {
+      setError('Failed to delete outfit. Please try again.');
+      console.error('Error deleting outfit:', err);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 pb-20">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-gray-200">
+      <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft size={24} />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Your Styles</h1>
-                <p className="text-sm text-gray-600">{total} outfit{total !== 1 ? 's' : ''} created</p>
-              </div>
-            </div>
-
+          <div className="flex items-center gap-4">
             <button
-              onClick={loadOutfits}
+              onClick={onBack}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              disabled={loading}
             >
-              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+              <ArrowLeft size={24} />
             </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Your Styles</h1>
+              <p className="text-sm text-gray-600">{total} saved outfit{total !== 1 ? 's' : ''}</p>
+            </div>
           </div>
 
-          {/* Search and Filters */}
-          <div className="flex flex-wrap gap-3">
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search outfits..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
+          {/* Filters */}
+          <div className="mt-4 flex gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search outfits..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
-
             <button
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 showFavoritesOnly
                   ? 'bg-pink-500 text-white'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  : 'bg-white border hover:bg-gray-50'
               }`}
             >
-              <Heart size={18} fill={showFavoritesOnly ? 'white' : 'none'} />
-              Favorites
-            </button>
-
-            <button
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-4 py-2 rounded-lg flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              {sortOrder === 'desc' ? <SortDesc size={18} /> : <SortAsc size={18} />}
-              {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
+              <Heart size={20} className={showFavoritesOnly ? 'fill-current' : ''} />
             </button>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {loading ? (
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {isLoading && (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent" />
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent" />
           </div>
-        ) : outfits.length === 0 ? (
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
+        {!isLoading && outfits.length === 0 && (
           <div className="text-center py-20">
-            <Sparkles size={64} className="mx-auto mb-4 text-gray-300" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              {searchQuery || showFavoritesOnly ? 'No outfits found' : 'No styles yet'}
+            <Star size={48} className="mx-auto text-gray-300 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">
+              {searchTerm || showFavoritesOnly
+                ? 'No outfits found'
+                : 'No saved outfits yet'}
             </h2>
-            <p className="text-gray-600">
-              {searchQuery || showFavoritesOnly
+            <p className="text-gray-500">
+              {searchTerm || showFavoritesOnly
                 ? 'Try adjusting your filters'
-                : 'Start creating virtual try-ons to build your style collection'}
+                : 'Create and save your first outfit to see it here'}
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        )}
+
+        {!isLoading && outfits.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {outfits.map((outfit) => (
               <motion.div
                 key={outfit.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
               >
                 {/* Image */}
                 <div className="relative aspect-[3/4] bg-gray-100">
                   {outfit.final_image_url ? (
                     <img
                       src={outfit.final_image_url}
-                      alt={outfit.outfit_name || 'Outfit'}
+                      alt={outfit.outfit_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : outfit.model_image_url ? (
+                    <img
+                      src={outfit.model_image_url}
+                      alt={outfit.outfit_name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Sparkles size={48} className="text-gray-300" />
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      No Image
                     </div>
                   )}
 
-                  {/* Favorite overlay */}
-                  <button
-                    onClick={() => handleToggleFavorite(outfit.id)}
-                    className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
-                  >
-                    <Heart
-                      size={20}
-                      fill={outfit.is_favorite ? '#ec4899' : 'none'}
-                      className={outfit.is_favorite ? 'text-pink-500' : 'text-gray-600'}
-                    />
-                  </button>
+                  {/* Favorite Badge */}
+                  {outfit.is_favorite && (
+                    <div className="absolute top-3 right-3 bg-pink-500 text-white p-2 rounded-full">
+                      <Heart size={16} className="fill-current" />
+                    </div>
+                  )}
 
-                  {/* Layer count */}
-                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 backdrop-blur-sm text-white text-xs rounded-full">
-                    {outfit.garment_layers.length} layer{outfit.garment_layers.length !== 1 ? 's' : ''}
-                  </div>
+                  {/* Layers Count */}
+                  {outfit.garment_layers && outfit.garment_layers.length > 0 && (
+                    <div className="absolute bottom-3 left-3 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
+                      {outfit.garment_layers.length} layer{outfit.garment_layers.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
 
-                {/* Details */}
+                {/* Info */}
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 mb-1 truncate">
-                    {outfit.outfit_name || 'Untitled Outfit'}
+                    {outfit.outfit_name}
                   </h3>
-                  
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                    <Calendar size={14} />
-                    {formatDate(outfit.created_at)}
-                  </div>
-
-                  {outfit.tags && outfit.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {outfit.tags.slice(0, 3).map((tag, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <p className="text-sm text-gray-500 mb-3">
+                    {new Date(outfit.created_at).toLocaleDateString()}
+                  </p>
 
                   {/* Actions */}
                   <div className="flex gap-2">
                     <button
                       onClick={() => onRestoreOutfit(outfit)}
-                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-sm font-semibold py-2 px-3 rounded-lg transition-all"
+                      className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
                     >
                       Restore
                     </button>
                     <button
-                      onClick={() => handleDelete(outfit.id)}
-                      className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                      onClick={() => handleToggleFavorite(outfit.id)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        outfit.is_favorite
+                          ? 'bg-pink-100 text-pink-600 hover:bg-pink-200'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
                     >
-                      <Trash2 size={18} />
+                      <Heart size={20} className={outfit.is_favorite ? 'fill-current' : ''} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(outfit.id)}
+                      className="p-2 bg-gray-100 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={20} />
                     </button>
                   </div>
                 </div>
@@ -259,6 +241,4 @@ const YourStyles: React.FC<YourStylesProps> = ({ onBack, onRestoreOutfit, userId
       </div>
     </div>
   );
-};
-
-export default YourStyles;
+}

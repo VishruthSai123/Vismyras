@@ -11,7 +11,6 @@ import { SignUpCredentials, LoginCredentials, UserProfile, VismyrasUser, AuthErr
 import { 
   UserOutfit, 
   SaveOutfitParams, 
-  UpdateOutfitParams, 
   OutfitHistoryFilters 
 } from '../types/outfitHistory';
 import { billingService } from './billingService';
@@ -234,19 +233,19 @@ class SupabaseService {
     }
   }
 
-  // ==================== OUTFIT HISTORY METHODS ====================
+  // ==================== OUTFIT HISTORY ====================
 
   /**
-   * Save outfit to history
+   * Save outfit
    */
-  public async saveOutfit(params: SaveOutfitParams): Promise<UserOutfit> {
+  public async saveOutfit(params: SaveOutfitParams): Promise<void> {
     const client = this.getClient();
 
-    const { data, error } = await client
+    const { error } = await client
       .from('user_outfit_history')
       .insert({
         user_id: params.user_id,
-        outfit_name: params.outfit_name,
+        outfit_name: params.outfit_name || `Outfit ${new Date().toLocaleDateString()}`,
         model_image_url: params.model_image_url,
         model_image_id: params.model_image_id,
         garment_layers: params.garment_layers,
@@ -254,19 +253,13 @@ class SupabaseService {
         final_image_id: params.final_image_id,
         pose_variation: params.pose_variation,
         tags: params.tags || [],
-      })
-      .select()
-      .single();
+      });
 
-    if (error) {
-      throw new Error('Failed to save outfit');
-    }
-
-    return data;
+    if (error) throw new Error('Failed to save outfit');
   }
 
   /**
-   * Get outfit history with count
+   * Get outfit history
    */
   public async getOutfitHistory(
     userId: string,
@@ -284,81 +277,25 @@ class SupabaseService {
     }
 
     if (filters?.search) {
-      query = query.or(
-        `outfit_name.ilike.%${filters.search}%,tags.cs.{${filters.search}}`
-      );
+      query = query.ilike('outfit_name', `%${filters.search}%`);
     }
 
-    const sortField = filters?.sort_by || 'created_at';
-    const sortOrder = filters?.sort_order || 'desc';
-    query = query.order(sortField, { ascending: sortOrder === 'asc' });
+    query = query.order(filters?.sort_by || 'created_at', { 
+      ascending: filters?.sort_order === 'asc' 
+    });
 
     if (filters?.limit) {
       query = query.limit(filters.limit);
     }
 
-    if (filters?.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
-    }
-
     const { data, error, count } = await query;
 
-    if (error) {
-      throw new Error('Failed to fetch outfit history');
-    }
+    if (error) throw new Error('Failed to load outfits');
 
     return {
       outfits: data || [],
       total: count || 0,
     };
-  }
-
-  /**
-   * Get single outfit
-   */
-  public async getOutfit(outfitId: string, userId: string): Promise<UserOutfit> {
-    const client = this.getClient();
-
-    const { data, error } = await client
-      .from('user_outfit_history')
-      .select('*')
-      .eq('id', outfitId)
-      .eq('user_id', userId)
-      .single();
-
-    if (error) {
-      throw new Error('Outfit not found');
-    }
-
-    return data;
-  }
-
-  /**
-   * Update outfit
-   */
-  public async updateOutfit(
-    outfitId: string,
-    userId: string,
-    updates: UpdateOutfitParams
-  ): Promise<UserOutfit> {
-    const client = this.getClient();
-
-    const { data, error } = await client
-      .from('user_outfit_history')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', outfitId)
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error('Failed to update outfit');
-    }
-
-    return data;
   }
 
   /**
@@ -373,58 +310,31 @@ class SupabaseService {
       .eq('id', outfitId)
       .eq('user_id', userId);
 
-    if (error) {
-      throw new Error('Failed to delete outfit');
-    }
+    if (error) throw new Error('Failed to delete outfit');
   }
 
   /**
-   * Toggle favorite status
+   * Toggle favorite
    */
-  public async toggleFavorite(
-    userId: string,
-    outfitId: string
-  ): Promise<UserOutfit> {
+  public async toggleFavorite(userId: string, outfitId: string): Promise<void> {
     const client = this.getClient();
 
-    // Get current status
-    const { data: current, error: fetchError } = await client
+    const { data: outfit } = await client
       .from('user_outfit_history')
       .select('is_favorite')
       .eq('id', outfitId)
       .eq('user_id', userId)
       .single();
 
-    if (fetchError) {
-      throw new Error('Failed to fetch outfit');
-    }
+    if (!outfit) throw new Error('Outfit not found');
 
-    // Toggle it
-    const { data, error } = await client
+    const { error } = await client
       .from('user_outfit_history')
-      .update({ is_favorite: !current.is_favorite })
+      .update({ is_favorite: !outfit.is_favorite })
       .eq('id', outfitId)
-      .eq('user_id', userId)
-      .select()
-      .single();
+      .eq('user_id', userId);
 
-    if (error) {
-      throw new Error('Failed to toggle favorite');
-    }
-
-    return data;
-  }
-
-  /**
-   * Increment view count
-   */
-  public async incrementViewCount(outfitId: string, userId: string): Promise<void> {
-    const client = this.getClient();
-
-    await client.rpc('increment_outfit_view_count', {
-      outfit_id: outfitId,
-      requesting_user_id: userId,
-    });
+    if (error) throw new Error('Failed to toggle favorite');
   }
 
   // ==================== STORAGE METHODS ====================
