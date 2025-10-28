@@ -125,14 +125,14 @@ const AppContent: React.FC = () => {
 
     let mounted = true;
 
-    // Set timeout to force auth loading completion
+    // Set timeout to force auth loading completion (safety net)
     const authTimeout = setTimeout(() => {
-      if (mounted) {
+      if (mounted && isAuthLoading) {
         setIsAuthLoading(false);
       }
-    }, 3000); // 3 second timeout
+    }, 5000); // 5 second timeout as safety net
 
-    // Subscribe to auth state changes FIRST
+    // Subscribe to auth state changes - this is the ONLY source of truth
     const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
       if (!mounted) return;
       
@@ -152,29 +152,8 @@ const AppContent: React.FC = () => {
       }
     });
 
-    // Then try to load current user (this will trigger INITIAL_SESSION event)
-    const loadAuth = async () => {
-      try {
-        const currentUser = await supabaseService.getCurrentUser();
-        
-        if (currentUser && mounted) {
-          // getCurrentUser succeeded, set user directly (backup in case event doesn't fire)
-          setUser(currentUser);
-          billingService.setCurrentUser(currentUser.auth.id);
-          billingService.loadFromSupabase(currentUser.billing);
-          refreshUsageStats();
-        }
-      } catch (err) {
-        // Ignore errors, auth event will handle it
-      } finally {
-        if (mounted) {
-          setIsAuthLoading(false);
-          clearTimeout(authTimeout);
-        }
-      }
-    };
-
-    loadAuth();
+    // Don't call getCurrentUser() - let the auth state change listener handle everything
+    // This prevents race conditions and duplicate requests
 
     return () => {
       mounted = false;

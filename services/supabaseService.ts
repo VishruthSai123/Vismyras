@@ -271,22 +271,59 @@ class SupabaseService {
     const client = this.getClient();
     let lastUserId: string | null = null;
     let lastEventTimestamp = 0;
+    let isProcessing = false;
 
     const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
       const now = Date.now();
       const currentUserId = session?.user?.id || null;
       
-      // Prevent duplicate events within 100ms for the same user
-      if (currentUserId === lastUserId && (now - lastEventTimestamp) < 100) {
+      // Prevent duplicate events within 100ms OR if already processing
+      if (isProcessing || (currentUserId === lastUserId && (now - lastEventTimestamp) < 100)) {
         return;
       }
       
+      isProcessing = true;
       lastEventTimestamp = now;
 
-      // Handle different auth events
-      if (event === 'INITIAL_SESSION') {
-        // On page load, restore session if it exists
-        if (session?.user) {
+      try {
+        // Handle different auth events
+        if (event === 'INITIAL_SESSION') {
+          // On page load, restore session if it exists
+          if (session?.user) {
+            lastUserId = session.user.id;
+            
+            // Get profile (create if doesn't exist)
+            let profile: UserProfile;
+            try {
+              profile = await this.getUserProfile(session.user.id);
+            } catch (err) {
+              // Profile doesn't exist, create it
+              const provider = session.user.app_metadata.provider || 'email';
+              profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
+            }
+
+            // Get billing (use defaults if fails)
+            let billing: any;
+            try {
+              billing = await this.loadUserBilling(session.user.id);
+            } catch (err) {
+              billing = billingService.getUserBilling();
+            }
+
+            callback({
+              auth: session.user,
+              profile,
+              billing,
+            });
+          } else {
+            // No session on initial load - user is logged out
+            lastUserId = null;
+            callback(null);
+          }
+          return;
+        }
+
+        if (event === 'SIGNED_IN' && session?.user) {
           lastUserId = session.user.id;
           
           // Get profile (create if doesn't exist)
@@ -312,40 +349,32 @@ class SupabaseService {
             profile,
             billing,
           });
-        }
-        // Don't call callback with null on INITIAL_SESSION without session
-        return;
-      }
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          // Only update if user hasn't changed
+          if (lastUserId === session.user.id) {
+            try {
+              const profile = await this.getUserProfile(session.user.id);
+              
+              let billing: any;
+              try {
+                billing = await this.loadUserBilling(session.user.id);
+              } catch (err) {
+                billing = billingService.getUserBilling();
+              }
 
-      if (event === 'SIGNED_IN' && session?.user) {
-        lastUserId = session.user.id;
-        
-        // Get profile (create if doesn't exist)
-        let profile: UserProfile;
-        try {
-          profile = await this.getUserProfile(session.user.id);
-        } catch (err) {
-          // Profile doesn't exist, create it
-          const provider = session.user.app_metadata.provider || 'email';
-          profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
-        }
-
-        // Get billing (use defaults if fails)
-        let billing: any;
-        try {
-          billing = await this.loadUserBilling(session.user.id);
-        } catch (err) {
-          billing = billingService.getUserBilling();
-        }
-
-        callback({
-          auth: session.user,
-          profile,
-          billing,
-        });
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        // Only update if user hasn't changed
-        if (lastUserId === session.user.id) {
+              callback({
+                auth: session.user,
+                profile,
+                billing,
+              });
+            } catch (err) {
+            }
+          }
+        } else if (event === 'SIGNED_OUT') {
+          lastUserId = null;
+          billingService.resetBilling();
+          callback(null);
+        } else if (event === 'USER_UPDATED' && session?.user) {
           try {
             const profile = await this.getUserProfile(session.user.id);
             
@@ -355,7 +384,7 @@ class SupabaseService {
             } catch (err) {
               billing = billingService.getUserBilling();
             }
-
+            
             callback({
               auth: session.user,
               profile,
@@ -364,28 +393,8 @@ class SupabaseService {
           } catch (err) {
           }
         }
-      } else if (event === 'SIGNED_OUT') {
-        lastUserId = null;
-        billingService.resetBilling();
-        callback(null);
-      } else if (event === 'USER_UPDATED' && session?.user) {
-        try {
-          const profile = await this.getUserProfile(session.user.id);
-          
-          let billing: any;
-          try {
-            billing = await this.loadUserBilling(session.user.id);
-          } catch (err) {
-            billing = billingService.getUserBilling();
-          }
-          
-          callback({
-            auth: session.user,
-            profile,
-            billing,
-          });
-        } catch (err) {
-        }
+      } finally {
+        isProcessing = false;
       }
     });
 
@@ -491,11 +500,18 @@ class SupabaseService {
     const client = this.getClient();
 
     try {
-      const { data, error } = await client
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Profile query timeout')), 5000)
+      );
+
+      const queryPromise = client
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
       if (error) {
         throw new AuthError('Failed to load user profile');
@@ -514,11 +530,18 @@ class SupabaseService {
     const client = this.getClient();
 
     try {
-      const { data, error } = await client
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Billing query timeout')), 5000)
+      );
+
+      const queryPromise = client
         .from('user_billing')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle(); // Use maybeSingle instead of single
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
       if (error) {
         return billingService.getUserBilling();
