@@ -321,24 +321,34 @@ class SupabaseService {
         lastUserId = session.user.id;
         
         try {
+          console.log('🔍 Fetching user profile...');
           let profile: UserProfile;
-          const existingProfile = await this.getUserProfile(session.user.id).catch(() => null);
+          const existingProfile = await this.getUserProfile(session.user.id).catch((err) => {
+            console.warn('⚠️ Profile not found, will create:', err.message);
+            return null;
+          });
 
           if (existingProfile) {
+            console.log('✅ Profile loaded');
             profile = existingProfile;
           } else {
+            console.log('🆕 Creating new profile...');
             const provider = session.user.app_metadata.provider || 'email';
             profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
+            console.log('✅ Profile created');
           }
 
           let billing: any;
           try {
+            console.log('🔍 Loading billing data...');
             billing = await this.loadUserBilling(session.user.id);
+            console.log('✅ Billing loaded');
           } catch (err) {
             console.warn('⚠️ Using default billing for sign in');
             billing = billingService.getUserBilling();
           }
 
+          console.log('✅ Calling auth callback with user data');
           callback({
             auth: session.user,
             profile,
