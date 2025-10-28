@@ -148,8 +148,11 @@ const AppContent: React.FC = () => {
         setUser(null);
       } finally {
         if (mounted) {
-          initialLoadComplete = true;
           setIsAuthLoading(false);
+          // Delay setting initialLoadComplete to allow INITIAL_SESSION event to process
+          setTimeout(() => {
+            initialLoadComplete = true;
+          }, 100);
         }
       }
     };
@@ -160,9 +163,16 @@ const AppContent: React.FC = () => {
     const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
       if (!mounted) return;
 
-      // Only process auth changes after initial load
+      // Allow INITIAL_SESSION to process during startup
       if (!initialLoadComplete) {
-        console.log('⏭️ Skipping auth change during initial load');
+        console.log('⏭️ Processing initial auth event');
+        // Update user if auth event provides one and we don't have it yet
+        if (newUser) {
+          setUser(newUser);
+          billingService.setCurrentUser(newUser.auth.id);
+          billingService.loadFromSupabase(newUser.billing);
+          refreshUsageStats();
+        }
         return;
       }
 
