@@ -517,11 +517,9 @@ class SupabaseService {
         .from('user_billing')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single
 
       if (error) {
-        console.warn('⚠️ Could not load billing from Supabase:', error.message);
-        // Return default billing data
         return billingService.getUserBilling();
       }
 
@@ -534,7 +532,6 @@ class SupabaseService {
       billingService.loadFromSupabase(data.billing_data);
       return billingService.getUserBilling();
     } catch (err) {
-      console.warn('⚠️ Billing load failed, using defaults:', err);
       return billingService.getUserBilling();
     }
   }

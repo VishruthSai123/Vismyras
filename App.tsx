@@ -124,74 +124,57 @@ const AppContent: React.FC = () => {
     supabaseService.initialize();
 
     let mounted = true;
-    let authEventProcessed = false;
 
     // Set timeout to force auth loading completion
     const authTimeout = setTimeout(() => {
-      if (mounted && isAuthLoading) {
-        console.log('⏰ Auth loading timeout - forcing completion');
+      if (mounted) {
         setIsAuthLoading(false);
       }
-    }, 2000); // 2 second timeout
+    }, 3000); // 3 second timeout
 
-    const loadAuth = async () => {
-      try {
-        console.log('🔄 Loading auth state...');
-        const currentUser = await supabaseService.getCurrentUser();
-        
-        if (!mounted) return;
-
-        if (currentUser) {
-          console.log('✅ User authenticated:', currentUser.profile.email);
-          setUser(currentUser);
-          billingService.setCurrentUser(currentUser.auth.id);
-          billingService.loadFromSupabase(currentUser.billing);
-          refreshUsageStats();
-        } else {
-          console.log('ℹ️ No user from getCurrentUser - waiting for auth event');
-          // Don't set user to null here - let auth state change handle it
-        }
-      } catch (err) {
-        console.error('❌ Error loading auth state:', err);
-        // Don't set user to null on error - let auth state change handle it
-      } finally {
-        if (mounted) {
-          console.log('✅ Auth loading complete, setting isAuthLoading = false');
-          clearTimeout(authTimeout);
-          setIsAuthLoading(false);
-        }
-      }
-    };
-
-    loadAuth();
-
-    // Subscribe to auth state changes
+    // Subscribe to auth state changes FIRST
     const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
       if (!mounted) return;
-
-      console.log('🔄 Auth state event:', newUser ? `User: ${newUser.profile.email}` : 'Logged out');
       
-      // Always process auth state changes
+      // Set user immediately
       setUser(newUser);
+      setIsAuthLoading(false);
+      clearTimeout(authTimeout);
       
       if (newUser) {
         billingService.setCurrentUser(newUser.auth.id);
         billingService.loadFromSupabase(newUser.billing);
         refreshUsageStats();
-        
-        // Show welcome toast only on subsequent logins (not initial load)
-        if (authEventProcessed) {
-          addToast(`Welcome back, ${newUser.profile.full_name || 'User'}! 👋`, 'success', 3000);
-        }
-        
-        authEventProcessed = true;
       } else {
         billingService.setCurrentUser(null);
         billingService.resetBilling();
         refreshUsageStats();
-        authEventProcessed = true;
       }
     });
+
+    // Then try to load current user (this will trigger INITIAL_SESSION event)
+    const loadAuth = async () => {
+      try {
+        const currentUser = await supabaseService.getCurrentUser();
+        
+        if (currentUser && mounted) {
+          // getCurrentUser succeeded, set user directly (backup in case event doesn't fire)
+          setUser(currentUser);
+          billingService.setCurrentUser(currentUser.auth.id);
+          billingService.loadFromSupabase(currentUser.billing);
+          refreshUsageStats();
+        }
+      } catch (err) {
+        // Ignore errors, auth event will handle it
+      } finally {
+        if (mounted) {
+          setIsAuthLoading(false);
+          clearTimeout(authTimeout);
+        }
+      }
+    };
+
+    loadAuth();
 
     return () => {
       mounted = false;
