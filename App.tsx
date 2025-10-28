@@ -4,6 +4,7 @@
 */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import StartScreen from './components/StartScreen';
 import Canvas from './components/Canvas';
@@ -30,6 +31,12 @@ import ToastContainer, { Toast } from './components/Toast';
 import UsageDisplay from './components/UsageDisplay';
 import PaywallModal from './components/PaywallModal';
 import { defaultWardrobe } from './wardrobe';
+
+// Legal Pages
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
+import RefundPolicy from './pages/RefundPolicy';
+import ContactUs from './pages/ContactUs';
 
 const POSE_INSTRUCTIONS = [
   "Full frontal view, hands on hips",
@@ -578,185 +585,198 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="font-sans">
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSignUp={handleSignUp}
-        onLogin={handleLogin}
-        onGoogleSignIn={handleGoogleSignIn}
-        isLoading={isLoading}
-      />
-      
-      <AnimatePresence mode="wait">
-        {!modelImageId ? (
-          <motion.div
-            key="start-screen"
-            className="w-screen min-h-screen flex items-start sm:items-center justify-center bg-gray-50 p-4 pb-20"
-            variants={viewVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-          >
-            {/* User Menu Button (Top Right) */}
-            {user && (
-              <div className="absolute top-4 right-4 z-50">
-                <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
-              </div>
-            )}
+    <Router>
+      <Routes>
+        {/* Legal Pages */}
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="/refund" element={<RefundPolicy />} />
+        <Route path="/contact" element={<ContactUs />} />
+        
+        {/* Main App */}
+        <Route path="/" element={
+          <div className="font-sans">
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
             
-            {/* Sign In Button (Top Right) for non-authenticated users */}
-            {!user && (
-              <div className="absolute top-4 right-4 z-50">
-                <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
-                >
-                  Sign In
-                </button>
-              </div>
-            )}
-            
-            <StartScreen onModelFinalized={handleModelFinalized} onToast={addToast} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="main-app"
-            className="flex flex-col h-screen bg-white overflow-hidden"
-            variants={viewVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-          >
-            <Header />
-            
-            {/* User Menu in Header (Top Right) */}
-            {user && (
-              <div className="absolute top-4 right-6 z-50">
-                <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
-              </div>
-            )}
-            
-            {/* Sign In Button for non-authenticated users */}
-            {!user && (
-              <div className="absolute top-4 right-6 z-50">
-                <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-md text-sm"
-                >
-                  Sign In
-                </button>
-              </div>
-            )}
-            
-            <main className="h-[calc(100vh-4rem)] relative flex flex-col md:flex-row overflow-hidden">
-              <div className="w-full h-full flex-grow flex items-center justify-center bg-white pb-16 relative">
-                <Canvas 
-                  displayImageId={displayImageId}
-                  onStartOver={handleStartOver}
-                  isLoading={isLoading}
-                  loadingMessage={loadingMessage}
-                  onSelectPose={handlePoseSelect}
-                  poseInstructions={POSE_INSTRUCTIONS}
-                  currentPoseIndex={currentPoseIndex}
-                  availablePoseKeys={availablePoseKeys}
-                />
-              </div>
-
-              <aside 
-                className={`absolute md:relative md:flex-shrink-0 bottom-0 right-0 h-[70vh] md:h-full w-full md:w-1/3 md:max-w-sm bg-white/80 backdrop-blur-md flex flex-col border-t md:border-t-0 md:border-l border-gray-200/60 transition-transform duration-500 ease-in-out ${isSheetCollapsed ? 'translate-y-[calc(100%-4rem)]' : 'translate-y-0'} md:translate-y-0`}
-                style={{ transitionProperty: 'transform' }}
-              >
-                  <button 
-                    onClick={() => setIsSheetCollapsed(!isSheetCollapsed)} 
-                    className="md:hidden w-full h-16 flex items-center justify-center flex-col gap-2 pt-2 bg-gray-50 border-t border-b border-gray-200/60"
-                    aria-label={isSheetCollapsed ? 'Show controls' : 'Hide controls'}
-                  >
-                    <div className="w-8 h-1 bg-gray-300 rounded-full" />
-                    <span className="text-sm font-semibold text-gray-600">
-                        {isSheetCollapsed ? 'Show Controls' : 'Hide Controls'}
-                    </span>
-                  </button>
-                  <div className="p-4 md:p-6 pb-20 overflow-y-auto flex-grow flex flex-col gap-8">
-                    {error && (
-                      <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-md" role="alert">
-                        <p className="font-bold">Error</p>
-                        <p>{error}</p>
-                      </div>
-                    )}
-                    <UsageDisplay
-                      used={usageStats.used}
-                      limit={usageStats.limit}
-                      remaining={usageStats.remaining}
-                      oneTimeCredits={usageStats.oneTimeCredits}
-                      percentUsed={usageStats.percentUsed}
-                      tier={usageStats.tier}
-                      daysUntilReset={usageStats.daysUntilReset}
-                      onUpgradeClick={handleUpgradeClick}
-                    />
-                    <OutfitStack 
-                      outfitHistory={activeOutfitLayers}
-                      onRemoveLastGarment={handleRemoveLastGarment}
-                      onSaveOutfit={handleSaveOutfit}
-                    />
-                    <SavedOutfitsPanel
-                      savedOutfits={savedOutfits}
-                      onLoadOutfit={handleLoadOutfit}
-                      onDeleteOutfit={handleDeleteOutfit}
-                      isLoading={isLoading}
-                    />
-                    <WardrobePanel
-                      onGarmentSelect={handleGarmentSelect}
-                      activeGarmentIds={activeGarmentIds}
-                      isLoading={isLoading}
-                      wardrobe={wardrobe}
-                    />
-                  </div>
-              </aside>
-            </main>
-            
-            <ChatFab onClick={() => setIsChatOpen(true)} />
-            
-            <ChatPanel 
-              isOpen={isChatOpen}
-              onClose={() => setIsChatOpen(false)}
-              onSubmit={handleChatSubmit}
+            {/* Auth Modal */}
+            <AuthModal
+              isOpen={isAuthModalOpen}
+              onClose={() => setIsAuthModalOpen(false)}
+              onSignUp={handleSignUp}
+              onLogin={handleLogin}
+              onGoogleSignIn={handleGoogleSignIn}
               isLoading={isLoading}
             />
-
-            <AnimatePresence>
-              {isLoading && isMobile && (
+            
+            <AnimatePresence mode="wait">
+              {!modelImageId ? (
                 <motion.div
-                  className="fixed inset-0 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center z-50"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  key="start-screen"
+                  className="w-screen min-h-screen flex items-start sm:items-center justify-center bg-gray-50 p-4 pb-20"
+                  variants={viewVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.5, ease: 'easeInOut' }}
                 >
-                  <Spinner />
-                  {loadingMessage && (
-                    <p className="text-lg font-serif text-gray-700 mt-4 text-center px-4">{loadingMessage}</p>
+                  {/* User Menu Button (Top Right) */}
+                  {user && (
+                    <div className="absolute top-4 right-4 z-50">
+                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
+                    </div>
                   )}
+                  
+                  {/* Sign In Button (Top Right) for non-authenticated users */}
+                  {!user && (
+                    <div className="absolute top-4 right-4 z-50">
+                      <button
+                        onClick={() => setIsAuthModalOpen(true)}
+                        className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
+                      >
+                        Sign In
+                      </button>
+                    </div>
+                  )}
+                  
+                  <StartScreen onModelFinalized={handleModelFinalized} onToast={addToast} />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="main-app"
+                  className="flex flex-col h-screen bg-white overflow-hidden"
+                  variants={viewVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.5, ease: 'easeInOut' }}
+                >
+                  <Header />
+                  
+                  {/* User Menu in Header (Top Right) */}
+                  {user && (
+                    <div className="absolute top-4 right-6 z-50">
+                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} />
+                    </div>
+                  )}
+                  
+                  {/* Sign In Button for non-authenticated users */}
+                  {!user && (
+                    <div className="absolute top-4 right-6 z-50">
+                      <button
+                        onClick={() => setIsAuthModalOpen(true)}
+                        className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-md text-sm"
+                      >
+                        Sign In
+                      </button>
+                    </div>
+                  )}
+                  
+                  <main className="h-[calc(100vh-4rem)] relative flex flex-col md:flex-row overflow-hidden">
+                    <div className="w-full h-full flex-grow flex items-center justify-center bg-white pb-16 relative">
+                      <Canvas 
+                        displayImageId={displayImageId}
+                        onStartOver={handleStartOver}
+                        isLoading={isLoading}
+                        loadingMessage={loadingMessage}
+                        onSelectPose={handlePoseSelect}
+                        poseInstructions={POSE_INSTRUCTIONS}
+                        currentPoseIndex={currentPoseIndex}
+                        availablePoseKeys={availablePoseKeys}
+                      />
+                    </div>
+
+                    <aside 
+                      className={`absolute md:relative md:flex-shrink-0 bottom-0 right-0 h-[70vh] md:h-full w-full md:w-1/3 md:max-w-sm bg-white/80 backdrop-blur-md flex flex-col border-t md:border-t-0 md:border-l border-gray-200/60 transition-transform duration-500 ease-in-out ${isSheetCollapsed ? 'translate-y-[calc(100%-4rem)]' : 'translate-y-0'} md:translate-y-0`}
+                      style={{ transitionProperty: 'transform' }}
+                    >
+                        <button 
+                          onClick={() => setIsSheetCollapsed(!isSheetCollapsed)} 
+                          className="md:hidden w-full h-16 flex items-center justify-center flex-col gap-2 pt-2 bg-gray-50 border-t border-b border-gray-200/60"
+                          aria-label={isSheetCollapsed ? 'Show controls' : 'Hide controls'}
+                        >
+                          <div className="w-8 h-1 bg-gray-300 rounded-full" />
+                          <span className="text-sm font-semibold text-gray-600">
+                              {isSheetCollapsed ? 'Show Controls' : 'Hide Controls'}
+                          </span>
+                        </button>
+                        <div className="p-4 md:p-6 pb-20 overflow-y-auto flex-grow flex flex-col gap-8">
+                          {error && (
+                            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-md" role="alert">
+                              <p className="font-bold">Error</p>
+                              <p>{error}</p>
+                            </div>
+                          )}
+                          <UsageDisplay
+                            used={usageStats.used}
+                            limit={usageStats.limit}
+                            remaining={usageStats.remaining}
+                            oneTimeCredits={usageStats.oneTimeCredits}
+                            percentUsed={usageStats.percentUsed}
+                            tier={usageStats.tier}
+                            daysUntilReset={usageStats.daysUntilReset}
+                            onUpgradeClick={handleUpgradeClick}
+                          />
+                          <OutfitStack 
+                            outfitHistory={activeOutfitLayers}
+                            onRemoveLastGarment={handleRemoveLastGarment}
+                            onSaveOutfit={handleSaveOutfit}
+                          />
+                          <SavedOutfitsPanel
+                            savedOutfits={savedOutfits}
+                            onLoadOutfit={handleLoadOutfit}
+                            onDeleteOutfit={handleDeleteOutfit}
+                            isLoading={isLoading}
+                          />
+                          <WardrobePanel
+                            onGarmentSelect={handleGarmentSelect}
+                            activeGarmentIds={activeGarmentIds}
+                            isLoading={isLoading}
+                            wardrobe={wardrobe}
+                          />
+                        </div>
+                    </aside>
+                  </main>
+                  
+                  <ChatFab onClick={() => setIsChatOpen(true)} />
+                  
+                  <ChatPanel 
+                    isOpen={isChatOpen}
+                    onClose={() => setIsChatOpen(false)}
+                    onSubmit={handleChatSubmit}
+                    isLoading={isLoading}
+                  />
+
+                  <AnimatePresence>
+                    {isLoading && isMobile && (
+                      <motion.div
+                        className="fixed inset-0 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center z-50"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <Spinner />
+                        {loadingMessage && (
+                          <p className="text-lg font-serif text-gray-700 mt-4 text-center px-4">{loadingMessage}</p>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  <PaywallModal
+                    isOpen={isPaywallOpen}
+                    onClose={() => setIsPaywallOpen(false)}
+                    onSubscribe={handleSubscribe}
+                    onBuyCredits={handleBuyCredits}
+                    currentTier={usageStats.tier}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
-            
-            <PaywallModal
-              isOpen={isPaywallOpen}
-              onClose={() => setIsPaywallOpen(false)}
-              onSubscribe={handleSubscribe}
-              onBuyCredits={handleBuyCredits}
-              currentTier={usageStats.tier}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <Footer isOnDressingScreen={!!modelImageId} />
-    </div>
+            <Footer isOnDressingScreen={!!modelImageId} />
+          </div>
+        } />
+      </Routes>
+    </Router>
   );
 };
 
