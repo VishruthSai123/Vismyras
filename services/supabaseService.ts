@@ -279,85 +279,62 @@ class SupabaseService {
       if (event === 'INITIAL_SESSION') {
         // On page load, restore session if it exists
         if (session?.user) {
-          console.log('🔄 Restoring session for user:', session.user.email);
           lastUserId = session.user.id;
           
-          try {
-            let profile: UserProfile;
-            const existingProfile = await this.getUserProfile(session.user.id).catch(() => null);
-
-            if (existingProfile) {
-              profile = existingProfile;
-            } else {
-              const provider = session.user.app_metadata.provider || 'email';
-              profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
-            }
-
-            let billing: any;
-            try {
-              billing = await this.loadUserBilling(session.user.id);
-            } catch (err) {
-              console.warn('⚠️ Using default billing for session restore');
-              billing = billingService.getUserBilling();
-            }
-
-            callback({
-              auth: session.user,
-              profile,
-              billing,
-            });
-          } catch (err) {
-            console.error('❌ Error restoring session:', err);
-            // Don't call callback if profile creation fails
-          }
-        }
-        // Don't call callback with null on INITIAL_SESSION without session
-        // This prevents logout on page refresh
-        return;
-      }
-
-      if (event === 'SIGNED_IN' && session?.user) {
-        console.log('✅ User signed in:', session.user.email);
-        lastUserId = session.user.id;
-        
-        try {
-          console.log('🔍 Fetching user profile...');
+          // Get profile (create if doesn't exist)
           let profile: UserProfile;
-          const existingProfile = await this.getUserProfile(session.user.id).catch((err) => {
-            console.warn('⚠️ Profile not found, will create:', err.message);
-            return null;
-          });
-
-          if (existingProfile) {
-            console.log('✅ Profile loaded');
-            profile = existingProfile;
-          } else {
-            console.log('🆕 Creating new profile...');
+          try {
+            profile = await this.getUserProfile(session.user.id);
+          } catch (err) {
+            // Profile doesn't exist, create it
             const provider = session.user.app_metadata.provider || 'email';
             profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
-            console.log('✅ Profile created');
           }
 
+          // Get billing (use defaults if fails)
           let billing: any;
           try {
-            console.log('🔍 Loading billing data...');
             billing = await this.loadUserBilling(session.user.id);
-            console.log('✅ Billing loaded');
           } catch (err) {
-            console.warn('⚠️ Using default billing for sign in');
             billing = billingService.getUserBilling();
           }
 
-          console.log('✅ Calling auth callback with user data');
           callback({
             auth: session.user,
             profile,
             billing,
           });
-        } catch (err) {
-          console.error('❌ Error handling sign in:', err);
-          // Don't call callback if profile creation fails
         }
+        // Don't call callback with null on INITIAL_SESSION without session
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        lastUserId = session.user.id;
+        
+        // Get profile (create if doesn't exist)
+        let profile: UserProfile;
+        try {
+          profile = await this.getUserProfile(session.user.id);
+        } catch (err) {
+          // Profile doesn't exist, create it
+          const provider = session.user.app_metadata.provider || 'email';
+          profile = await this.createUserProfile(session.user, provider as 'email' | 'google');
+        }
+
+        // Get billing (use defaults if fails)
+        let billing: any;
+        try {
+          billing = await this.loadUserBilling(session.user.id);
+        } catch (err) {
+          billing = billingService.getUserBilling();
+        }
+
+        callback({
+          auth: session.user,
+          profile,
+          billing,
+        });
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         console.log('🔄 Token refreshed for user:', session.user.email);
         // Only update if user hasn't changed
@@ -475,35 +452,35 @@ class SupabaseService {
   private async createUserProfile(user: User, provider: 'email' | 'google'): Promise<UserProfile> {
     const client = this.getClient();
 
-    const profile: Omit<UserProfile, 'created_at' | 'updated_at'> = {
+    const profile: UserProfile = {
       id: user.id,
       email: user.email!,
       full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
       avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
       auth_provider: provider,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await client
-      .from('user_profiles')
-      .upsert({
-        ...profile,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await client
+        .from('user_profiles')
+        .upsert(profile)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating user profile:', error);
-      // Return profile anyway - database table might not exist yet
-      return {
-        ...profile,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      if (error) {
+        console.error('Error creating user profile:', error);
+        // Return profile anyway - user can still use the app
+        return profile;
+      }
+
+      return data || profile;
+    } catch (err) {
+      console.error('Profile creation failed:', err);
+      // Return profile anyway
+      return profile;
     }
-
-    return data;
   }
 
   /**
@@ -512,17 +489,21 @@ class SupabaseService {
   private async getUserProfile(userId: string): Promise<UserProfile> {
     const client = this.getClient();
 
-    const { data, error } = await client
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await client
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (error) {
+      if (error) {
+        throw new AuthError('Failed to load user profile');
+      }
+
+      return data;
+    } catch (err) {
       throw new AuthError('Failed to load user profile');
     }
-
-    return data;
   }
 
   /**
