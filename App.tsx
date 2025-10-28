@@ -111,39 +111,29 @@ const AppContent: React.FC = () => {
     setUsageStats(billingService.getUsageStats());
   }, []);
 
-  // Sync billing data to Supabase
-  const syncBillingToSupabase = useCallback(async () => {
-    if (user) {
-      const billingData = billingService.getBillingDataForSync();
-      await supabaseService.saveBillingData(user.auth.id, billingData);
-    }
-  }, [user]);
-
-  // Initialize Supabase and check auth state
+  // Initialize auth - simple and clean
   useEffect(() => {
     supabaseService.initialize();
-
+    
     let mounted = true;
-
-    // Set timeout to force auth loading completion (safety net)
-    const authTimeout = setTimeout(() => {
-      if (mounted && isAuthLoading) {
+    
+    // Safety timeout
+    const timeout = setTimeout(() => {
+      if (mounted) {
         setIsAuthLoading(false);
       }
-    }, 5000); // 5 second timeout as safety net
-
-    // Subscribe to auth state changes - this is the ONLY source of truth
+    }, 10000);
+    
+    // Subscribe to auth changes
     const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
       if (!mounted) return;
       
-      // Set user immediately
       setUser(newUser);
       setIsAuthLoading(false);
-      clearTimeout(authTimeout);
+      clearTimeout(timeout);
       
       if (newUser) {
         billingService.setCurrentUser(newUser.auth.id);
-        billingService.loadFromSupabase(newUser.billing);
         refreshUsageStats();
       } else {
         billingService.setCurrentUser(null);
@@ -152,15 +142,12 @@ const AppContent: React.FC = () => {
       }
     });
 
-    // Don't call getCurrentUser() - let the auth state change listener handle everything
-    // This prevents race conditions and duplicate requests
-
     return () => {
       mounted = false;
-      clearTimeout(authTimeout);
+      clearTimeout(timeout);
       unsubscribe();
     };
-  }, []); // Only run once on mount
+  }, []);
 
   // Effect to load state from localStorage and IndexedDB on initial mount
   useEffect(() => {
@@ -253,7 +240,7 @@ const AppContent: React.FC = () => {
     try {
       billingService.consumeTryOn('try-on');
       refreshUsageStats();
-      syncBillingToSupabase();
+      
       addToast('First try-on complete! Usage tracked.', 'success', 3000);
     } catch (err) {
       if (err instanceof UsageLimitError) {
@@ -318,12 +305,11 @@ const AppContent: React.FC = () => {
         return [...prev, garmentInfo];
       });
       addToast(`Successfully added ${garmentInfo.name}!`, 'success', 3000);
-      refreshUsageStats(); // Update usage display
-      await syncBillingToSupabase(); // Sync to cloud
+      refreshUsageStats();
       
       // Auto-save outfit after successful garment addition
       if (user?.auth?.id) {
-        setTimeout(() => autoSaveOutfit(), 1000); // Delay to ensure state updates
+        setTimeout(() => autoSaveOutfit(), 1000);
       }
     } catch (err) {
       if (err instanceof UsageLimitError) {
@@ -474,7 +460,7 @@ const AppContent: React.FC = () => {
           setLoadingMessage('');
           setIsPaywallOpen(false);
           refreshUsageStats();
-          await syncBillingToSupabase();
+          await 
           addToast('🎉 Welcome to Premium! You now have 25 try-ons per month.', 'success', 5000);
         },
         (error) => {
@@ -484,7 +470,7 @@ const AppContent: React.FC = () => {
         }
       );
     }
-  }, [addToast, refreshUsageStats, syncBillingToSupabase, user]);
+  }, [addToast, refreshUsageStats, user]);
 
   const handleBuyCredits = useCallback(async (tryOns: number, price: number) => {
     if (!user) {
@@ -504,7 +490,7 @@ const AppContent: React.FC = () => {
         setLoadingMessage('');
         setIsPaywallOpen(false);
         refreshUsageStats();
-        await syncBillingToSupabase();
+        await 
         addToast(`✅ Success! Added ${tryOns} try-on${tryOns > 1 ? 's' : ''} to your account.`, 'success', 5000);
       },
       (error) => {
@@ -513,7 +499,7 @@ const AppContent: React.FC = () => {
         addToast(error.message || 'Payment failed. Please try again.', 'error', 5000);
       }
     );
-  }, [addToast, refreshUsageStats, syncBillingToSupabase, user]);
+  }, [addToast, refreshUsageStats, user]);
 
   const handleUpgradeClick = useCallback(() => {
     setIsPaywallOpen(true);
@@ -522,36 +508,30 @@ const AppContent: React.FC = () => {
   // Auth handlers
   const handleSignUp = useCallback(async (credentials: SignUpCredentials) => {
     try {
-      const newUser = await supabaseService.signUp(credentials);
-      setUser(newUser);
-      billingService.setCurrentUser(newUser.auth.id);
+      await supabaseService.signUp(credentials);
+      // Auth state change listener will handle the rest
       setIsAuthModalOpen(false);
       addToast('🎉 Account created successfully! Welcome to Vismyras!', 'success', 5000);
-      await syncBillingToSupabase();
     } catch (err) {
       if (err instanceof AuthError) {
-        throw err; // Let modal handle the error display
+        throw err;
       }
       throw new AuthError('Failed to create account. Please try again.');
     }
-  }, [addToast, syncBillingToSupabase]);
+  }, [addToast]);
 
   const handleLogin = useCallback(async (credentials: LoginCredentials) => {
     try {
-      const loggedInUser = await supabaseService.login(credentials);
-      setUser(loggedInUser);
-      billingService.setCurrentUser(loggedInUser.auth.id);
-      billingService.loadFromSupabase(loggedInUser.billing);
-      refreshUsageStats();
+      await supabaseService.login(credentials);
+      // Auth state change listener will handle the rest
       setIsAuthModalOpen(false);
-      addToast(`Welcome back, ${loggedInUser.profile.full_name || 'User'}!`, 'success', 4000);
     } catch (err) {
       if (err instanceof AuthError) {
-        throw err; // Let modal handle the error display
+        throw err;
       }
       throw new AuthError('Failed to login. Please try again.');
     }
-  }, [addToast, refreshUsageStats]);
+  }, []);
 
   const handleGoogleSignIn = useCallback(async () => {
     try {
@@ -599,32 +579,24 @@ const AppContent: React.FC = () => {
 
   const handleLogout = useCallback(async () => {
     try {
-      // Clear all outfit workspace
       handleStartOver();
-      
-      // Reset auth and billing
       await supabaseService.logout();
-      setUser(null);
-      billingService.setCurrentUser(null);
-      billingService.resetBilling();
-      refreshUsageStats();
       
-      // Close usage screen if open
-      setShowUsageScreen(false);
-      setShowStylesScreen(false);
-      
-      // Clear all localStorage except auth token (Supabase handles that)
+      // Clear localStorage
       localStorage.removeItem('vismyras_modelImageId');
       localStorage.removeItem('vismyras_outfitHistory');
       localStorage.removeItem('vismyras_currentOutfitIndex');
       localStorage.removeItem('vismyras_wardrobe');
       localStorage.removeItem('vismyras_savedOutfits');
       
+      setShowUsageScreen(false);
+      setShowStylesScreen(false);
+      
       addToast('Logged out successfully. See you soon! 👋', 'info', 3000);
     } catch (err) {
       addToast('Failed to logout. Please try again.', 'error', 3000);
     }
-  }, [addToast, refreshUsageStats]);
+  }, [addToast]);
 
   const handleViewBilling = useCallback(() => {
     setIsPaywallOpen(true);
