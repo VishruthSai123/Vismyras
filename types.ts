@@ -22,6 +22,11 @@ export interface OutfitLayer {
 
 export interface SavedOutfit {
   id: string;
-  layers: OutfitLayer[];
-  previewUrl: string;
+  name?: string;
+  modelImageUrl: string; // Base64 or URL of the model image
+  modelImageId?: string; // For reference
+  layers: OutfitLayer[]; // Complete outfit stack (all layers)
+  previewUrl: string; // Final result image (thumbnail)
+  poseVariation?: string;
+  createdAt?: string;
 }

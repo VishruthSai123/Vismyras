@@ -35,10 +35,8 @@ export class RazorpayService {
     // Get the appropriate key based on mode
     if (this.isLiveMode) {
       this.razorpayKeyId = import.meta.env.VITE_RAZORPAY_LIVE_KEY_ID || '';
-      console.log('🔴 Razorpay: LIVE MODE');
     } else {
       this.razorpayKeyId = import.meta.env.VITE_RAZORPAY_TEST_KEY_ID || '';
-      console.log('🟢 Razorpay: TEST MODE');
     }
     
     if (!this.razorpayKeyId) {

@@ -25,7 +25,6 @@ import AuthModal from './components/AuthModal';
 import UserMenu from './components/UserMenu';
 import Footer from './components/Footer';
 import Spinner from './components/Spinner';
-import ChatFab from './components/ChatFab';
 import ChatPanel from './components/ChatPanel';
 import ToastContainer, { Toast } from './components/Toast';
 import UsageDisplay from './components/UsageDisplay';
@@ -309,10 +308,7 @@ const AppContent: React.FC = () => {
       addToast(`Successfully added ${garmentInfo.name}!`, 'success', 3000);
       refreshUsageStats();
       
-      // Auto-save outfit after successful garment addition
-      if (user?.auth?.id) {
-        setTimeout(() => autoSaveOutfit(), 1000);
-      }
+      // Auto-save will be triggered by useEffect watching outfitHistory changes
     } catch (err) {
       if (err instanceof UsageLimitError) {
         addToast(err.message, 'warning', 7000);
@@ -387,19 +383,64 @@ const AppContent: React.FC = () => {
     if (activeOutfitLayers.length <= 1 || !displayImageId) return;
     const newSavedOutfit: SavedOutfit = {
         id: `outfit-${Date.now()}`,
+        name: `Outfit ${new Date().toLocaleDateString()}`,
+        modelImageUrl: modelImageId, // Store the current model image ID
+        modelImageId: modelImageId,
         layers: activeOutfitLayers,
         previewUrl: displayImageId,
+        createdAt: new Date().toISOString(),
     };
     setSavedOutfits(prev => [newSavedOutfit, ...prev]);
     addToast('Outfit saved successfully! 💾', 'success', 3000);
   };
 
-  const handleLoadOutfit = (outfitToLoad: SavedOutfit) => {
+  const handleLoadOutfit = async (outfitToLoad: SavedOutfit) => {
     if (isLoading) return;
-    setOutfitHistory(outfitToLoad.layers);
-    setCurrentOutfitIndex(outfitToLoad.layers.length - 1);
-    setCurrentPoseIndex(0);
-    addToast('Outfit loaded! 👗', 'success', 2000);
+    
+    try {
+      setIsLoading(true);
+      setLoadingMessage('Loading your style...');
+      
+      // Restore model image to IndexedDB
+      if (outfitToLoad.modelImageUrl) {
+        // Convert data URL back to blob
+        const response = await fetch(outfitToLoad.modelImageUrl);
+        const blob = await response.blob();
+        const modelId = outfitToLoad.modelImageId || `restored_model_${Date.now()}`;
+        await db.putImage(blob, modelId);
+        setModelImageId(modelId);
+      }
+      
+      // Restore all garment layers with their images
+      for (const layer of outfitToLoad.layers) {
+        // Restore pose images for each layer
+        for (const [pose, imageUrl] of Object.entries(layer.poseImages || {})) {
+          if (imageUrl && imageUrl.startsWith('data:')) {
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            // Generate a unique ID for this image
+            const imageId = `restored_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            await db.putImage(blob, imageId);
+            // Update the layer to use the new ID
+            layer.poseImages[pose] = imageId;
+          }
+        }
+      }
+      
+      // Set the complete outfit stack
+      setOutfitHistory(outfitToLoad.layers);
+      setCurrentOutfitIndex(outfitToLoad.layers.length - 1);
+      setCurrentPoseIndex(0);
+      
+      setIsLoading(false);
+      setLoadingMessage('');
+      addToast('✨ Style restored with all layers!', 'success', 3000);
+    } catch (error) {
+      console.error('Failed to load outfit:', error);
+      setIsLoading(false);
+      setLoadingMessage('');
+      addToast('Failed to load style. Please try again.', 'error', 3000);
+    }
   };
 
   const handleDeleteOutfit = (outfitId: string) => {
@@ -605,30 +646,15 @@ const AppContent: React.FC = () => {
     try {
       // Get the current layer (final result with all garments)
       const currentLayer = outfitHistory[currentOutfitIndex];
-      if (!currentLayer) {
-        console.log('❌ No current layer found at index:', currentOutfitIndex);
-        return;
-      }
+      if (!currentLayer) return;
 
       // Get the final generated image (the complete outfit)
       const finalImageId = currentLayer?.poseImages?.[POSE_INSTRUCTIONS[currentPoseIndex]];
-      if (!finalImageId) {
-        console.log('❌ No final image to save yet. Current layer:', currentLayer);
-        console.log('Available pose images:', currentLayer?.poseImages);
-        console.log('Looking for pose:', POSE_INSTRUCTIONS[currentPoseIndex]);
-        return;
-      }
-
-      console.log('📸 Saving outfit with final image ID:', finalImageId);
-      console.log('📚 Total layers in outfit:', outfitHistory.length);
-      console.log('📍 Current index:', currentOutfitIndex);
+      if (!finalImageId) return;
 
       // Convert final image blob to base64 data URL (permanent)
       const finalBlob = await db.getImage(finalImageId);
-      if (!finalBlob) {
-        console.log('❌ Final image blob not found in IndexedDB');
-        return;
-      }
+      if (!finalBlob) return;
 
       const finalImageDataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -650,25 +676,72 @@ const AppContent: React.FC = () => {
       // Save ALL layers up to current index (the complete stack)
       const completeStack = outfitHistory.slice(0, currentOutfitIndex + 1);
 
+      // Convert all pose images in all layers from IndexedDB IDs to base64 data URLs
+      const completeStackWithDataUrls = await Promise.all(
+        completeStack.map(async (layer) => {
+          const poseImagesWithDataUrls: Record<string, string> = {};
+          
+          for (const [pose, imageId] of Object.entries(layer.poseImages)) {
+            // Ensure imageId is a string
+            const imgId = String(imageId);
+            
+            // Check if it's already a data URL or external URL
+            if (imgId.startsWith('data:') || imgId.startsWith('http')) {
+              poseImagesWithDataUrls[pose] = imgId;
+            } else {
+              // Convert IndexedDB ID to base64 data URL
+              const blob = await db.getImage(imgId);
+              if (blob) {
+                const dataUrl = await new Promise<string>((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result as string);
+                  reader.readAsDataURL(blob);
+                });
+                poseImagesWithDataUrls[pose] = dataUrl;
+              } else {
+                console.warn('⚠️ Image not found in IndexedDB:', imgId);
+              }
+            }
+          }
+          
+          return {
+            ...layer,
+            poseImages: poseImagesWithDataUrls,
+          };
+        })
+      );
+
       await supabaseService.saveOutfit({
         user_id: user.auth.id,
         outfit_name: `Outfit ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
         model_image_url: modelImageDataUrl, // Base64 data URL
         model_image_id: modelImageId,
-        garment_layers: completeStack, // Save complete stack
+        garment_layers: completeStackWithDataUrls, // Save complete stack with data URLs
         final_image_url: finalImageDataUrl, // Base64 data URL - the complete final image
         final_image_id: finalImageId,
         pose_variation: POSE_INSTRUCTIONS[currentPoseIndex],
       });
       
-      console.log('✅ Outfit saved successfully!');
-      console.log('   - Final image size:', Math.round(finalImageDataUrl.length / 1024), 'KB');
-      console.log('   - Layers saved:', completeStack.length);
     } catch (err) {
       console.error('❌ Failed to save outfit:', err);
       // Silent fail - don't interrupt user workflow
     }
   }, [user, outfitHistory, currentOutfitIndex, modelImageId, currentPoseIndex]);
+
+  // Auto-save outfit to database whenever the outfit changes
+  useEffect(() => {
+    if (!user?.auth?.id || outfitHistory.length === 0) return;
+    
+    // Only save if there are actual garments (not just base model)
+    if (currentOutfitIndex === 0 && outfitHistory.length === 1) return;
+    
+    // Debounce: save 2 seconds after the last change
+    const timeoutId = setTimeout(() => {
+      autoSaveOutfit();
+    }, 2000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [user, outfitHistory, currentOutfitIndex, currentPoseIndex, autoSaveOutfit]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -706,21 +779,51 @@ const AppContent: React.FC = () => {
     setShowStylesScreen(true);
   }, []);
 
-  const handleRestoreOutfit = useCallback((outfit: any) => {
-    // Restore the outfit to the workspace
-    if (outfit.model_image_url) {
-      setModelImageId(outfit.model_image_id || `restored-${Date.now()}`);
-      // Store restored image URL for later use
-      localStorage.setItem('vismyras_restored_model_url', outfit.model_image_url);
+  const handleRestoreOutfit = useCallback(async (outfit: any) => {
+    try {
+      setIsLoading(true);
+      setLoadingMessage('Restoring your complete workspace...');
+      
+      // Restore model image to IndexedDB
+      if (outfit.model_image_url) {
+        const response = await fetch(outfit.model_image_url);
+        const blob = await response.blob();
+        const modelId = outfit.model_image_id || `restored_model_${Date.now()}`;
+        await db.putImage(blob, modelId);
+        setModelImageId(modelId);
+      }
+      
+      // Restore all garment layers with their images
+      if (outfit.garment_layers && outfit.garment_layers.length > 0) {
+        for (const layer of outfit.garment_layers) {
+          // Restore pose images for each layer
+          for (const [pose, imageUrl] of Object.entries(layer.poseImages || {})) {
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('data:')) {
+              const response = await fetch(imageUrl);
+              const blob = await response.blob();
+              // Generate a unique ID for this image
+              const imageId = `restored_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              await db.putImage(blob, imageId);
+              // Update the layer to use the new ID
+              layer.poseImages[pose] = imageId;
+            }
+          }
+        }
+        
+        setOutfitHistory(outfit.garment_layers);
+        setCurrentOutfitIndex(outfit.garment_layers.length - 1);
+      }
+      
+      setIsLoading(false);
+      setLoadingMessage('');
+      setShowStylesScreen(false);
+      addToast('✨ Workspace restored with all layers! Continue editing or add more items.', 'success', 4000);
+    } catch (error) {
+      console.error('Failed to restore outfit:', error);
+      setIsLoading(false);
+      setLoadingMessage('');
+      addToast('Failed to restore workspace. Please try again.', 'error', 3000);
     }
-    
-    if (outfit.garment_layers && outfit.garment_layers.length > 0) {
-      setOutfitHistory(outfit.garment_layers);
-      setCurrentOutfitIndex(outfit.garment_layers.length - 1);
-    }
-    
-    setShowStylesScreen(false);
-    addToast('Outfit restored! Continue editing or add more items.', 'success', 4000);
   }, [addToast]);
 
 
@@ -889,6 +992,7 @@ const AppContent: React.FC = () => {
                         poseInstructions={POSE_INSTRUCTIONS}
                         currentPoseIndex={currentPoseIndex}
                         availablePoseKeys={availablePoseKeys}
+                        onChatOpen={() => setIsChatOpen(true)}
                       />
                     </div>
 
@@ -944,11 +1048,6 @@ const AppContent: React.FC = () => {
                         </div>
                     </aside>
                   </main>
-                  
-                  <ChatFab 
-                    onClick={() => setIsChatOpen(true)} 
-                    hideOnMobile={!isSheetCollapsed}
-                  />
                   
                   <ChatPanel 
                     isOpen={isChatOpen}

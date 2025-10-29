@@ -8,9 +8,25 @@ import { MessageSquareIcon } from './icons';
 interface ChatFabProps {
   onClick: () => void;
   hideOnMobile?: boolean;
+  variant?: 'floating' | 'inline'; // New prop for positioning
 }
 
-const ChatFab: React.FC<ChatFabProps> = ({ onClick, hideOnMobile = false }) => {
+const ChatFab: React.FC<ChatFabProps> = ({ onClick, hideOnMobile = false, variant = 'floating' }) => {
+  if (variant === 'inline') {
+    // Inline variant - smaller, positioned beside Start Over
+    return (
+      <button
+        onClick={onClick}
+        className={`flex items-center justify-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm ${hideOnMobile ? 'hidden sm:flex' : ''}`}
+        aria-label="AI Style Editor"
+      >
+        <MessageSquareIcon className="w-4 h-4 mr-2" />
+        AI Edit
+      </button>
+    );
+  }
+
+  // Original floating variant
   return (
     <button
       onClick={onClick}

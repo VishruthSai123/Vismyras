@@ -26,7 +26,6 @@ const ContactUs: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // TODO: Implement actual form submission (email service or API)
-    console.log('Form submitted:', formData);
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);

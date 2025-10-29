@@ -133,7 +133,6 @@ class SupabaseService {
       // Check if email confirmation is required
       if (data.user && !data.session) {
         // Email confirmation required - user needs to check email
-        console.log('Email confirmation required for:', data.user.email);
         return null; // Return null to indicate confirmation needed
       }
 
@@ -177,16 +176,31 @@ class SupabaseService {
   public async loginWithGoogle(): Promise<void> {
     const client = this.getClient();
 
+    // Get the current origin for redirect
+    const redirectUrl = `${window.location.origin}/`;
+
     const { error } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}`,
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
 
     if (error) {
-      throw new AuthError('Google login failed');
+      console.error('Google OAuth error:', error);
+      throw new AuthError('Google login failed: ' + error.message);
     }
+  }
+
+  /**
+   * Sign in with Google OAuth (alias for loginWithGoogle)
+   */
+  public async signInWithGoogle(): Promise<void> {
+    return this.loginWithGoogle();
   }
 
   /**
