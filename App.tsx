@@ -72,6 +72,7 @@ const useMediaQuery = (query: string): boolean => {
 
 const AppContent: React.FC = () => {
   const [modelImageId, setModelImageId] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null); // Unique ID for current styling session
   const [outfitHistory, setOutfitHistory] = useState<OutfitLayer[]>([]);
   const [currentOutfitIndex, setCurrentOutfitIndex] = useState<number>(0);
   const [wardrobe, setWardrobe] = useState<WardrobeItem[]>(defaultWardrobe);
@@ -231,6 +232,11 @@ const AppContent: React.FC = () => {
 
   const handleModelFinalized = (id: string) => {
     setModelImageId(id);
+    
+    // Generate unique workspace ID for this styling session
+    const newWorkspaceId = `workspace_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setWorkspaceId(newWorkspaceId);
+    
     setOutfitHistory([{
       garment: null,
       poseImages: { [POSE_INSTRUCTIONS[0]]: id }
@@ -242,7 +248,7 @@ const AppContent: React.FC = () => {
       billingService.consumeTryOn('try-on');
       refreshUsageStats();
       
-      addToast('First try-on complete! Usage tracked.', 'success', 3000);
+      addToast('✨ New styling workspace created! All changes will be saved as one unique style.', 'success', 4000);
     } catch (err) {
       if (err instanceof UsageLimitError) {
         addToast(err.message, 'warning', 7000);
@@ -254,6 +260,7 @@ const AppContent: React.FC = () => {
   const handleStartOver = () => {
     // Clear state
     setModelImageId(null);
+    setWorkspaceId(null); // Clear workspace - next upload will create new one
     setOutfitHistory([]);
     setCurrentOutfitIndex(0);
     setWardrobe(defaultWardrobe);
@@ -265,6 +272,8 @@ const AppContent: React.FC = () => {
     setError(null);
     setCurrentPoseIndex(0);
     setIsSheetCollapsed(true);
+    
+    addToast('✨ Starting fresh! Your previous style has been saved.', 'info', 3000);
     
     // Clear storage is handled by the useEffect hook when modelImageId becomes null
   };
@@ -647,7 +656,7 @@ const AppContent: React.FC = () => {
 
   // Auto-save outfit to database
   const autoSaveOutfit = useCallback(async () => {
-    if (!user?.auth?.id || outfitHistory.length === 0) return;
+    if (!user?.auth?.id || !workspaceId || outfitHistory.length === 0) return;
     
     try {
       // Get the current layer (final result with all garments)
@@ -717,9 +726,12 @@ const AppContent: React.FC = () => {
         })
       );
 
+      // Upsert with workspace_id - updates existing or creates new
+      // This ensures all edits in one workspace are saved as ONE style
       await supabaseService.saveOutfit({
         user_id: user.auth.id,
-        outfit_name: `Outfit ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+        workspace_id: workspaceId, // Unique workspace identifier
+        outfit_name: `Style ${new Date().toLocaleDateString()}`,
         model_image_url: modelImageDataUrl, // Base64 data URL
         model_image_id: modelImageId,
         garment_layers: completeStackWithDataUrls, // Save complete stack with data URLs
@@ -732,7 +744,7 @@ const AppContent: React.FC = () => {
       console.error('❌ Failed to save outfit:', err);
       // Silent fail - don't interrupt user workflow
     }
-  }, [user, outfitHistory, currentOutfitIndex, modelImageId, currentPoseIndex]);
+  }, [user, workspaceId, outfitHistory, currentOutfitIndex, modelImageId, currentPoseIndex]);
 
   // Auto-save outfit to database whenever the outfit changes
   useEffect(() => {
@@ -790,6 +802,11 @@ const AppContent: React.FC = () => {
       setIsLoading(true);
       setLoadingMessage('Restoring your complete workspace...');
       
+      // Restore workspace_id so edits continue in the same workspace
+      if (outfit.workspace_id) {
+        setWorkspaceId(outfit.workspace_id);
+      }
+      
       // Restore model image to IndexedDB
       if (outfit.model_image_url) {
         const response = await fetch(outfit.model_image_url);
@@ -823,7 +840,7 @@ const AppContent: React.FC = () => {
       setIsLoading(false);
       setLoadingMessage('');
       setShowStylesScreen(false);
-      addToast('✨ Workspace restored with all layers! Continue editing or add more items.', 'success', 4000);
+      addToast('✨ Workspace restored! Continue editing and all changes will update this style.', 'success', 4000);
     } catch (error) {
       console.error('Failed to restore outfit:', error);
       setIsLoading(false);

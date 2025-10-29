@@ -270,11 +270,14 @@ class SupabaseService {
   public async saveOutfit(params: SaveOutfitParams): Promise<void> {
     const client = this.getClient();
 
+    // Use upsert to update existing workspace or create new one
+    // This ensures one workspace = one style, preventing duplicates
     const { error } = await client
       .from('user_outfit_history')
-      .insert({
+      .upsert({
         user_id: params.user_id,
-        outfit_name: params.outfit_name || `Outfit ${new Date().toLocaleDateString()}`,
+        workspace_id: params.workspace_id,
+        outfit_name: params.outfit_name || `Style ${new Date().toLocaleDateString()}`,
         model_image_url: params.model_image_url,
         model_image_id: params.model_image_id,
         garment_layers: params.garment_layers,
@@ -282,6 +285,8 @@ class SupabaseService {
         final_image_id: params.final_image_id,
         pose_variation: params.pose_variation,
         tags: params.tags || [],
+      }, {
+        onConflict: 'user_id,workspace_id', // Update if workspace already exists
       });
 
     if (error) throw new Error('Failed to save outfit');

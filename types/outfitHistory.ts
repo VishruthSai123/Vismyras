@@ -10,6 +10,7 @@ import { OutfitLayer } from '../types';
 export interface UserOutfit {
   id: string;
   user_id: string;
+  workspace_id: string; // Unique ID for this styling session/workspace
   outfit_name: string | null;
   description: string | null;
   tags: string[];
@@ -37,6 +38,7 @@ export interface UserOutfit {
 
 export interface SaveOutfitParams {
   user_id: string;
+  workspace_id: string; // Unique ID for this styling session
   outfit_name?: string;
   model_image_url: string;
   model_image_id?: string;
