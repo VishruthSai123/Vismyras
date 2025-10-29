@@ -17,7 +17,7 @@ interface WardrobePanelProps {
 
 interface CategorySelectionModalProps {
   file: File;
-  onConfirm: (gender: Gender, category: Category) => void;
+  onConfirm: (gender: Gender, category: Category, aiPrompt?: string) => void;
   onCancel: () => void;
   genders: Gender[];
   categories: Category[];
@@ -31,67 +31,121 @@ const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({
   categories 
 }) => {
   const [selectedGender, setSelectedGender] = useState<Gender | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [aiPrompt, setAiPrompt] = useState<string>('');
   const imageUrl = useMemo(() => URL.createObjectURL(file), [file]);
+  
+  // Always include "Custom" option for uploaded items
+  const allCategories: Category[] = useMemo(() => {
+    const cats = [...categories];
+    if (!cats.includes('Custom')) {
+      cats.push('Custom');
+    }
+    return cats;
+  }, [categories]);
+  
+  const handleCategorySelect = (category: Category) => {
+    if (category === 'Custom') {
+      setSelectedCategory(category);
+    } else {
+      onConfirm(selectedGender!, category);
+    }
+  };
+  
+  const handleCustomConfirm = () => {
+    if (selectedCategory === 'Custom') {
+      onConfirm(selectedGender!, selectedCategory, aiPrompt.trim() || undefined);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
       <motion.div
         initial={{ scale: 0.95, y: 20, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.95, y: 20, opacity: 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="relative bg-white rounded-2xl w-full max-w-md flex flex-col shadow-xl"
+        className="relative bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-xl overflow-hidden"
       >
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-xl font-serif tracking-wider text-gray-800">
-            {selectedGender ? 'Select Category' : 'Select Gender'}
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b flex-shrink-0">
+          <h2 className="text-lg sm:text-xl font-serif tracking-wider text-gray-800">
+            {selectedCategory === 'Custom' ? 'AI Prompt (Optional)' : selectedGender ? 'Select Category' : 'Select Gender'}
           </h2>
-          <button onClick={onCancel} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-800">
-            <XIcon className="w-6 h-6" />
+          <button onClick={onCancel} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-800 active:scale-95 transition-transform">
+            <XIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto">
-          <div className="flex flex-col sm:flex-row gap-6 items-center">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-grow">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
             <div className="flex-shrink-0">
-              <img src={imageUrl} alt="Uploaded garment preview" className="w-32 h-32 object-contain rounded-lg border bg-gray-100" />
-              <p className="text-xs text-gray-600 mt-1 text-center truncate max-w-[8rem]" title={file.name}>{file.name}</p>
+              <img src={imageUrl} alt="Uploaded garment preview" className="w-24 h-24 sm:w-32 sm:h-32 object-contain rounded-lg border bg-gray-100" />
+              <p className="text-xs text-gray-600 mt-1 text-center truncate max-w-[6rem] sm:max-w-[8rem]" title={file.name}>{file.name}</p>
             </div>
             <div className="flex-grow w-full">
               {!selectedGender ? (
                 <>
-                  <p className="text-gray-700 mb-3 font-medium">Who is this garment for?</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <p className="text-sm sm:text-base text-gray-700 mb-3 font-medium text-center sm:text-left">Who is this garment for?</p>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     {genders.map((gender) => (
                       <button
                         key={gender}
                         onClick={() => setSelectedGender(gender)}
-                        className="w-full text-center px-6 py-3 text-base font-semibold rounded-lg transition-colors bg-gray-200/80 text-gray-700 hover:bg-gray-300/80"
+                        className="w-full text-center px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold rounded-lg transition-all bg-gray-200/80 text-gray-700 hover:bg-gray-300/80 active:scale-[0.98]"
                       >
                         {gender}
                       </button>
                     ))}
                   </div>
                 </>
+              ) : selectedCategory === 'Custom' ? (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm sm:text-base text-gray-700 font-medium">
+                      Category: <span className="text-gray-900">Custom</span>
+                    </p>
+                    <button 
+                      onClick={() => setSelectedCategory(null)}
+                      className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 underline active:scale-95 transition-transform"
+                    >
+                      Back
+                    </button>
+                  </div>
+                  <p className="text-sm sm:text-base text-gray-700 mb-2 font-medium">Tell AI what to do with this image:</p>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="E.g., 'Remove background', 'Make it look more vibrant', 'Add a subtle pattern'..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                    rows={3}
+                  />
+                  <p className="text-xs text-gray-500 mt-1 mb-3">Optional: Leave blank to use as-is</p>
+                  <button
+                    onClick={handleCustomConfirm}
+                    className="w-full px-4 py-2.5 text-sm sm:text-base font-semibold rounded-lg transition-all bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.98]"
+                  >
+                    {aiPrompt.trim() ? '✨ Apply with AI' : 'Continue'}
+                  </button>
+                </>
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-gray-700 font-medium">
+                    <p className="text-sm sm:text-base text-gray-700 font-medium">
                       Gender: <span className="text-gray-900">{selectedGender}</span>
                     </p>
                     <button 
                       onClick={() => setSelectedGender(null)}
-                      className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 underline active:scale-95 transition-transform"
                     >
                       Change
                     </button>
                   </div>
-                  <p className="text-gray-700 mb-3 font-medium">What type of garment is this?</p>
+                  <p className="text-sm sm:text-base text-gray-700 mb-3 font-medium text-center sm:text-left">What type of garment is this?</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {categories.map((category) => (
+                    {allCategories.map((category) => (
                       <button
                         key={category}
-                        onClick={() => onConfirm(selectedGender, category)}
-                        className="w-full text-center px-4 py-2 text-sm font-semibold rounded-md transition-colors bg-gray-200/80 text-gray-700 hover:bg-gray-300/80"
+                        onClick={() => handleCategorySelect(category)}
+                        className="w-full text-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-md transition-all bg-gray-200/80 text-gray-700 hover:bg-gray-300/80 active:scale-[0.98]"
                       >
                         {category}
                       </button>
@@ -136,7 +190,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
     
     const categories: Category[] = useMemo(() => {
         const allCategories = [...new Set(wardrobe.map(item => item.category))];
-        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive'];
+        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive', 'Custom'];
         return orderPriority.filter(c => allCategories.includes(c));
     }, [wardrobe]);
     
@@ -151,7 +205,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
     
     const categoriesForGender = useMemo(() => {
         const cats = [...new Set(filteredByGender.map(item => item.category))];
-        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive'];
+        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive', 'Custom'];
         return orderPriority.filter(c => cats.includes(c));
     }, [filteredByGender]);
     
@@ -203,7 +257,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
         }
     };
 
-    const handleCategoryConfirm = async (gender: Gender, category: Category) => {
+    const handleCategoryConfirm = async (gender: Gender, category: Category, aiPrompt?: string) => {
         if (!pendingFile) return;
 
         try {
@@ -216,6 +270,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
                 url: imageId,
                 gender: gender,
                 category: category,
+                aiPrompt: aiPrompt, // Store AI prompt with the item
             };
             
             onGarmentSelect(pendingFile, customGarmentInfo);

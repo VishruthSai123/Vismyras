@@ -46,12 +46,13 @@ const WardrobeModal: React.FC<WardrobeModalProps> = ({ isOpen, onClose, onGarmen
                 setError('Please select an image file.');
                 return;
             }
-            // FIX: Add missing 'category' property to conform to WardrobeItem type.
+            // Use "Custom" category for quick uploads without selection
             const customGarmentInfo: WardrobeItem = {
                 id: `custom-${Date.now()}`,
                 name: file.name,
                 url: URL.createObjectURL(file), // for preview, not used by API
-                category: 'Custom',
+                gender: 'Men', // Default gender
+                category: 'Custom', // Custom category for uploaded items
             };
             onGarmentSelect(file, customGarmentInfo);
         }

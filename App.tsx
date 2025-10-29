@@ -290,10 +290,28 @@ const AppContent: React.FC = () => {
 
     setError(null);
     setIsLoading(true);
-    setLoadingMessage(garmentInfo.category === 'Accessories' ? `Adding ${garmentInfo.name}...` : `Putting on ${garmentInfo.name}...`);
+    
+    // Check if this is a custom item with AI prompt
+    const hasAiPrompt = garmentInfo.aiPrompt && garmentInfo.aiPrompt.trim().length > 0;
+    setLoadingMessage(
+      hasAiPrompt 
+        ? `✨ Applying with AI: "${garmentInfo.aiPrompt}"...` 
+        : garmentInfo.category === 'Accessories' 
+          ? `Adding ${garmentInfo.name}...` 
+          : `Putting on ${garmentInfo.name}...`
+    );
 
     try {
-      const newImageId = await generateVirtualTryOnImage(displayImageId, garmentFile, garmentInfo.category);
+      let newImageId: string;
+      
+      // If custom item has AI prompt, use chat edit to apply with AI instructions
+      if (hasAiPrompt && garmentFile instanceof File) {
+        newImageId = await generateChatEdit(displayImageId, garmentInfo.aiPrompt!, garmentFile);
+      } else {
+        // Standard virtual try-on
+        newImageId = await generateVirtualTryOnImage(displayImageId, garmentFile, garmentInfo.category);
+      }
+      
       const currentPoseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
       
       const newLayer: OutfitLayer = { 
@@ -314,7 +332,11 @@ const AppContent: React.FC = () => {
         }
         return [...prev, garmentInfo];
       });
-      addToast(`Successfully added ${garmentInfo.name}!`, 'success', 3000);
+      
+      const successMessage = hasAiPrompt 
+        ? `✨ AI applied successfully to ${garmentInfo.name}!` 
+        : `Successfully added ${garmentInfo.name}!`;
+      addToast(successMessage, 'success', 3000);
       refreshUsageStats();
       
       // Auto-save will be triggered by useEffect watching outfitHistory changes

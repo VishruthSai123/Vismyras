@@ -5,7 +5,7 @@
 
 export type Gender = 'Men' | 'Women';
 
-export type Category = 'Tops' | 'Bottoms' | 'Dresses' | 'Outerwear' | 'Accessories' | 'Indian Festive';
+export type Category = 'Tops' | 'Bottoms' | 'Dresses' | 'Outerwear' | 'Accessories' | 'Indian Festive' | 'Custom';
 
 export interface WardrobeItem {
   id: string;
@@ -13,6 +13,7 @@ export interface WardrobeItem {
   url: string;
   gender: Gender;
   category: Category;
+  aiPrompt?: string; // Optional AI instructions for custom items
 }
 
 export interface OutfitLayer {
