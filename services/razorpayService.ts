@@ -181,10 +181,10 @@ export class RazorpayService {
       // Razorpay options
       const options: RazorpayPaymentOptions = {
         key: this.razorpayKeyId,
-        amount: amount * 100, // Convert to paise
+        amount: amount * 100, // Convert to paise (19900 paise = ₹199)
         currency: 'INR',
         name: 'Vismyras',
-        description: 'Premium Subscription - ₹199/month',
+        description: `Premium Subscription - ₹${amount}/month`,
         order_id: orderId,
         prefill: {
           name: '',
@@ -275,10 +275,10 @@ export class RazorpayService {
       // Razorpay options
       const options: RazorpayPaymentOptions = {
         key: this.razorpayKeyId,
-        amount: amount * 100, // Convert to paise
+        amount: amount * 100, // Convert to paise (amount in rupees * 100)
         currency: 'INR',
         name: 'Vismyras',
-        description: `${tryOnsCount} Try-On Credits`,
+        description: `${tryOnsCount} Try-On Credits - ₹${amount}`,
         order_id: orderId,
         prefill: {
           name: '',
