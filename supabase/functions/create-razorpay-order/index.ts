@@ -40,7 +40,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: Math.round(amount), // Amount in paise (smallest currency unit)
+        amount: Math.round(amount), // Amount directly in rupees (no paise conversion)
         currency: currency || 'INR',
         receipt: `receipt_${Date.now()}`,
         notes: notes || {},

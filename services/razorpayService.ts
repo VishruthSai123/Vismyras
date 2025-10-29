@@ -172,17 +172,16 @@ export class RazorpayService {
       };
       billingService.addTransaction(transaction);
 
-      // Create order (amount already in rupees, convert to paise)
-      const orderId = await this.createOrder(amount * 100, 'INR', {
+      // Create order (pass amount directly in rupees)
+      const orderId = await this.createOrder(amount, 'INR', {
         type: 'subscription',
         plan: 'premium_monthly',
       });
 
       // Razorpay options
-      // NOTE: amount should match the order amount (already in paise from createOrder)
       const options: RazorpayPaymentOptions = {
         key: this.razorpayKeyId,
-        amount: amount * 100, // Must match order amount (paise)
+        amount: amount, // Pass amount directly (rupees)
         currency: 'INR',
         name: 'Vismyras',
         description: `Premium Subscription - ₹${amount}/month`,
@@ -267,8 +266,8 @@ export class RazorpayService {
       };
       billingService.addTransaction(transaction);
 
-      // Create order
-      const orderId = await this.createOrder(amount * 100, 'INR', {
+      // Create order (pass amount directly in rupees)
+      const orderId = await this.createOrder(amount, 'INR', {
         type: 'credits',
         tryOnsCount,
       });
@@ -276,7 +275,7 @@ export class RazorpayService {
       // Razorpay options
       const options: RazorpayPaymentOptions = {
         key: this.razorpayKeyId,
-        amount: amount * 100, // Convert to paise (amount in rupees * 100)
+        amount: amount, // Pass amount directly (rupees)
         currency: 'INR',
         name: 'Vismyras',
         description: `${tryOnsCount} Try-On Credits - ₹${amount}`,
