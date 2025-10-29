@@ -461,7 +461,7 @@ const AppContent: React.FC = () => {
           setIsPaywallOpen(false);
           refreshUsageStats();
           await 
-          addToast('🎉 Welcome to Premium! You now have 25 try-ons per month.', 'success', 5000);
+          addToast('🎉 Welcome to Premium! You now have 50 try-ons per month.', 'success', 5000);
         },
         (error) => {
           setIsLoading(false);

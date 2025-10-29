@@ -36,7 +36,7 @@ const RefundPolicy: React.FC = () => {
             <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-6">2.1 Subscription Details</h3>
             <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
               <li><strong>Monthly Plan</strong>: ₹199/month</li>
-              <li><strong>Includes</strong>: 25 virtual try-ons per month</li>
+              <li><strong>Includes</strong>: 50 virtual try-ons per month</li>
               <li><strong>Billing</strong>: Automatically renewed monthly</li>
             </ul>
 

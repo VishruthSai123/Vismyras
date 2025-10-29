@@ -80,7 +80,7 @@ const TermsAndConditions: React.FC = () => {
             <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-6">4.2 Premium Plan</h3>
             <ul className="list-disc list-inside text-gray-700 space-y-2 ml-4">
               <li>₹199 per month</li>
-              <li>25 virtual try-ons per month</li>
+              <li>50 virtual try-ons per month</li>
               <li>All premium features</li>
               <li>Priority processing</li>
               <li>Auto-renewal (can be cancelled anytime)</li>

@@ -43,7 +43,7 @@ async function grantPremiumAccess(userId: string, subscriptionId: string, endDat
   await supabase
     .from('user_billing')
     .update({
-      usage_limit: 1000, // Premium limit
+      usage_limit: 50, // Premium limit - 50 try-ons per month
     })
     .eq('user_id', userId);
 
@@ -168,18 +168,16 @@ async function handlePaymentEvent(event: any) {
 
   console.log(`💳 Payment Event: ${event.event} for user ${userId}`);
 
-  // Record payment in database
-  await supabase.from('razorpay_payments').insert({
+  // Log payment event in webhook_events table
+  await supabase.from('webhook_events').insert({
+    event_id: paymentId,
+    event_type: event.event,
+    entity_type: 'payment',
+    entity_id: paymentId,
     user_id: userId,
-    razorpay_payment_id: paymentId,
-    razorpay_order_id: entity.order_id,
-    amount,
-    currency: entity.currency,
-    status,
-    payment_method: entity.method,
-    type: type || 'subscription',
-    notes: notes,
-    created_at: new Date(entity.created_at * 1000).toISOString(),
+    payload: event,
+    processed: true,
+    processed_at: new Date().toISOString(),
   });
 
   if (event.event === 'payment.captured') {
@@ -216,31 +214,36 @@ async function handleRefundEvent(event: any) {
 
   console.log(`💰 Refund Event: ${event.event} for payment ${paymentId}`);
 
-  // Get the payment to find user
-  const { data: payment } = await supabase
-    .from('razorpay_payments')
-    .select('user_id, type, notes')
-    .eq('razorpay_payment_id', paymentId)
+  // Get the payment from webhook_events to find user
+  const { data: paymentEvent } = await supabase
+    .from('webhook_events')
+    .select('user_id, payload')
+    .eq('entity_id', paymentId)
+    .eq('entity_type', 'payment')
     .single();
 
-  if (!payment) {
-    console.error('Payment not found for refund');
+  if (!paymentEvent) {
+    console.error('Payment event not found for refund');
     return;
   }
 
-  const userId = payment.user_id;
+  const userId = paymentEvent.user_id;
+  const paymentData = paymentEvent.payload?.payload?.payment?.entity || {};
+  const type = paymentData.notes?.type;
 
-  // Update payment status
-  await supabase
-    .from('razorpay_payments')
-    .update({
-      status: 'refunded',
-      refund_amount: amount,
-      refunded_at: new Date().toISOString(),
-    })
-    .eq('razorpay_payment_id', paymentId);
+  // Log refund event
+  await supabase.from('webhook_events').insert({
+    event_id: entity.id,
+    event_type: event.event,
+    entity_type: 'refund',
+    entity_id: entity.id,
+    user_id: userId,
+    payload: event,
+    processed: true,
+    processed_at: new Date().toISOString(),
+  });
 
-  if (payment.type === 'credits') {
+  if (type === 'credits') {
     // Revoke one-time credits
     console.log(`🚫 REVOKING CREDITS for user ${userId} due to refund`);
     
@@ -248,7 +251,7 @@ async function handleRefundEvent(event: any) {
       .from('user_one_time_purchases')
       .delete()
       .eq('razorpay_payment_id', paymentId);
-  } else if (payment.type === 'subscription') {
+  } else if (type === 'subscription') {
     // Revoke premium access
     await revokePremiumAccess(userId, 'Refund processed');
   }

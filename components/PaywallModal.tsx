@@ -154,7 +154,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
                     <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <h4 className="font-semibold text-blue-900 text-sm mb-2">💡 Why Premium?</h4>
                       <p className="text-xs text-blue-700">
-                        Premium costs ₹199/month for 100 try-ons = <strong>₹2 per try-on</strong>.
+                        Premium costs ₹199/month for 50 try-ons = <strong>₹4 per try-on</strong>.
                         Pay-per-use costs ₹9 per try-on. Save <strong>78%</strong> with Premium!
                       </p>
                     </div>
@@ -227,7 +227,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
                     <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       <h4 className="font-semibold text-yellow-900 text-sm mb-2">💰 Best Value</h4>
                       <p className="text-xs text-yellow-700">
-                        Credits valid for 30 days. For regular use, Premium subscription offers 5x better value at just ₹2 per try-on!
+                        Credits valid for 30 days. For regular use, Premium subscription offers 2.5x better value at just ₹4 per try-on!
                       </p>
                     </div>
                   </motion.div>

@@ -157,7 +157,7 @@ const UsageDisplay: React.FC<UsageDisplayProps> = ({
           className="mt-3 pt-3 border-t border-gray-200"
         >
           <p className="text-xs text-gray-600 mb-2">
-            Get 25 try-ons/month with Premium
+            Get 50 try-ons/month with Premium
           </p>
           <button
             onClick={onUpgradeClick}

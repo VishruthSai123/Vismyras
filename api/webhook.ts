@@ -122,7 +122,7 @@ async function handlePaymentCaptured(payment: any) {
       .update({
         subscription_tier: 'PREMIUM',
         subscription_status: 'active',
-        monthly_limit: 25,
+        monthly_limit: 50,
         monthly_used: 0,
         period_start: new Date(),
         period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),

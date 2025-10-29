@@ -134,7 +134,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     monthlyLimit: 100,
     description: 'Best for fashion enthusiasts',
     features: [
-      '100 try-ons per month',
+      '50 try-ons per month',
       'All clothing categories',
       'Unlimited pose variations',
       'AI style editing',
