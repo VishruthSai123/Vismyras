@@ -13,21 +13,47 @@ serve(async (req) => {
   }
 
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json()
+    // Get Razorpay secret from environment FIRST
+    const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')
 
-    // Validate input
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    console.log('Environment check:', {
+      hasKeySecret: !!RAZORPAY_KEY_SECRET,
+      keySecretLength: RAZORPAY_KEY_SECRET?.length
+    })
+
+    if (!RAZORPAY_KEY_SECRET) {
+      console.error('Missing RAZORPAY_KEY_SECRET')
       return new Response(
-        JSON.stringify({ error: 'Missing payment verification parameters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Razorpay secret not configured. Check Supabase secrets.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Get Razorpay secret from environment
-    const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')
+    const body = await req.json()
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body
 
-    if (!RAZORPAY_KEY_SECRET) {
-      throw new Error('Razorpay secret not configured')
+    console.log('Verification request:', {
+      hasOrderId: !!razorpay_order_id,
+      hasPaymentId: !!razorpay_payment_id,
+      hasSignature: !!razorpay_signature,
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id
+    })
+
+    // Validate input
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      console.error('Missing parameters:', { razorpay_order_id, razorpay_payment_id, razorpay_signature })
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing payment verification parameters',
+          details: {
+            hasOrderId: !!razorpay_order_id,
+            hasPaymentId: !!razorpay_payment_id,
+            hasSignature: !!razorpay_signature
+          }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Verify signature
@@ -37,20 +63,45 @@ serve(async (req) => {
 
     const isValid = expectedSignature === razorpay_signature
 
+    console.log('Signature verification:', {
+      isValid,
+      expectedSignaturePrefix: expectedSignature.substring(0, 10),
+      receivedSignaturePrefix: razorpay_signature.substring(0, 10)
+    })
+
+    if (!isValid) {
+      console.error('Invalid signature')
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Invalid payment signature',
+          message: 'Payment verification failed'
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    console.log('✅ Payment verified successfully')
     return new Response(
       JSON.stringify({ 
-        success: isValid,
-        message: isValid ? 'Payment verified successfully' : 'Invalid payment signature'
+        success: true,
+        message: 'Payment verified successfully'
       }),
       { 
-        status: isValid ? 200 : 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Verification error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Payment verification failed',
+        details: error.toString()
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

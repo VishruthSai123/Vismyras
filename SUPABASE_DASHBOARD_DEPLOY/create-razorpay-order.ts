@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +12,24 @@ serve(async (req) => {
   }
 
   try {
+    // Get Razorpay credentials from environment FIRST
+    const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID')
+    const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')
+
+    console.log('Environment check:', {
+      hasKeyId: !!RAZORPAY_KEY_ID,
+      hasKeySecret: !!RAZORPAY_KEY_SECRET,
+      keyIdPrefix: RAZORPAY_KEY_ID?.substring(0, 10)
+    })
+
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      console.error('Missing Razorpay credentials')
+      return new Response(
+        JSON.stringify({ error: 'Razorpay credentials not configured. Check Supabase secrets.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const { amount, currency, notes } = await req.json()
 
     // Validate input
@@ -21,14 +38,6 @@ serve(async (req) => {
         JSON.stringify({ error: 'Invalid amount' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
-    }
-
-    // Get Razorpay credentials from environment
-    const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID')
-    const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')
-
-    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-      throw new Error('Razorpay credentials not configured')
     }
 
     // Create Razorpay order
