@@ -172,16 +172,17 @@ export class RazorpayService {
       };
       billingService.addTransaction(transaction);
 
-      // Create order
+      // Create order (amount already in rupees, convert to paise)
       const orderId = await this.createOrder(amount * 100, 'INR', {
         type: 'subscription',
         plan: 'premium_monthly',
       });
 
       // Razorpay options
+      // NOTE: amount should match the order amount (already in paise from createOrder)
       const options: RazorpayPaymentOptions = {
         key: this.razorpayKeyId,
-        amount: amount * 100, // Convert to paise (19900 paise = ₹199)
+        amount: amount * 100, // Must match order amount (paise)
         currency: 'INR',
         name: 'Vismyras',
         description: `Premium Subscription - ₹${amount}/month`,
