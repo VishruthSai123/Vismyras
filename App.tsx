@@ -268,7 +268,7 @@ const AppContent: React.FC = () => {
     // Clear storage is handled by the useEffect hook when modelImageId becomes null
   };
 
-  const handleGarmentSelect = useCallback(async (garmentFile: File, garmentInfo: WardrobeItem) => {
+  const handleGarmentSelect = useCallback(async (garmentFile: File | string, garmentInfo: WardrobeItem) => {
     if (!displayImageId || isLoading) return;
 
     const nextLayer = outfitHistory[currentOutfitIndex + 1];
@@ -712,10 +712,19 @@ const AppContent: React.FC = () => {
                 user={user}
                 onBack={() => setShowStylesScreen(false)} 
                 onRestoreOutfit={handleRestoreOutfit}
+                onLogout={handleLogout}
+                onViewBilling={handleViewBilling}
+                onViewUsage={handleViewUsage}
+                onViewStyles={handleViewStyles}
               />
             ) : (
-              <div className="w-screen h-screen flex items-center justify-center">
-                <p className="text-gray-600">Please sign in to view your styles</p>
+              <div className="w-screen h-screen flex flex-col">
+                <Header 
+                  onAuthClick={() => setIsAuthModalOpen(true)}
+                />
+                <div className="flex-grow flex items-center justify-center">
+                  <p className="text-gray-600">Please sign in to view your styles</p>
+                </div>
               </div>
             )
           ) : showUsageScreen ? (
@@ -738,73 +747,71 @@ const AppContent: React.FC = () => {
               {!modelImageId ? (
                 <motion.div
                   key="start-screen"
-                  className="w-screen min-h-screen flex items-start sm:items-center justify-center bg-gray-50 p-4 pb-20"
+                  className="w-screen min-h-screen flex flex-col bg-gray-50"
                   variants={viewVariants}
                   initial="initial"
                   animate="animate"
                   exit="exit"
                   transition={{ duration: 0.5, ease: 'easeInOut' }}
                 >
-                  {/* User Menu Button (Top Right) */}
-                  {user && (
-                    <div className="absolute top-4 right-4 z-50">
-                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} onViewStyles={handleViewStyles} />
-                    </div>
-                  )}
+                  {/* Header */}
+                  <Header 
+                    user={user}
+                    onAuthClick={() => setIsAuthModalOpen(true)}
+                    onLogout={handleLogout}
+                    onViewBilling={handleViewBilling}
+                    onViewUsage={handleViewUsage}
+                    onViewStyles={handleViewStyles}
+                  />
                   
-                  {/* Sign In Button (Top Right) for non-authenticated users */}
-                  {!user && (
-                    <div className="absolute top-4 right-4 z-50">
-                      <button
-                        onClick={() => setIsAuthModalOpen(true)}
-                        className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
-                      >
-                        Sign In
-                      </button>
-                    </div>
-                  )}
-                  
-                  {user ? (
-                    <StartScreen onModelFinalized={handleModelFinalized} onToast={addToast} />
-                  ) : (
-                    <div className="max-w-2xl mx-auto text-center">
-                      <h1 className="text-5xl md:text-6xl font-serif font-bold text-gray-900 leading-tight mb-6">
-                        Vismyras: Visualize Your Style.
-                      </h1>
-                      <p className="text-xl text-gray-600 mb-8">
-                        Sign in to start your virtual try-on experience with AI-powered fashion visualization.
-                      </p>
-                      <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        <button
-                          onClick={() => setIsAuthModalOpen(true)}
-                          className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-lg text-lg"
-                        >
-                          Get Started - Sign In
-                        </button>
-                      </div>
-                      <p className="text-gray-500 text-sm mt-6">
-                        Free tier includes 3 virtual try-ons per month
-                      </p>
-                      {/* Feature highlights */}
-                      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                          <div className="text-3xl mb-3">🎨</div>
-                          <h3 className="font-semibold text-gray-900 mb-2">AI-Powered</h3>
-                          <p className="text-gray-600 text-sm">Advanced AI creates realistic virtual try-ons</p>
+                  {/* Main Content */}
+                  <div className="flex-grow flex items-center justify-center p-4 pb-20">
+                    {user ? (
+                      <StartScreen onModelFinalized={handleModelFinalized} onToast={addToast} />
+                    ) : (
+                      <div className="max-w-4xl mx-auto text-center px-4">
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-gray-900 leading-tight mb-6">
+                          Vismyras: Visualize Your Style.
+                        </h1>
+                        <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+                          Sign in to start your virtual try-on experience with AI-powered fashion visualization.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                          <button
+                            onClick={() => setIsAuthModalOpen(true)}
+                            className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-lg text-lg"
+                          >
+                            Get Started - Sign In
+                          </button>
                         </div>
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                          <div className="text-3xl mb-3">👗</div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Extensive Wardrobe</h3>
-                          <p className="text-gray-600 text-sm">Try on various clothes and accessories</p>
-                        </div>
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                          <div className="text-3xl mb-3">💾</div>
-                          <h3 className="font-semibold text-gray-900 mb-2">Save & Share</h3>
-                          <p className="text-gray-600 text-sm">Save your favorite looks and share them</p>
+                        <p className="text-gray-500 text-sm mt-6">
+                          Free tier includes 3 virtual try-ons per month
+                        </p>
+                        
+                        {/* Feature highlights */}
+                        <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left max-w-4xl mx-auto">
+                          <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                            <div className="text-4xl mb-3">🎨</div>
+                            <h3 className="font-semibold text-gray-900 mb-2 text-lg">AI-Powered</h3>
+                            <p className="text-gray-600 text-sm">Advanced AI creates realistic virtual try-ons</p>
+                          </div>
+                          <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                            <div className="text-4xl mb-3">👗</div>
+                            <h3 className="font-semibold text-gray-900 mb-2 text-lg">Extensive Wardrobe</h3>
+                            <p className="text-gray-600 text-sm">Try on various clothes and accessories</p>
+                          </div>
+                          <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                            <div className="text-4xl mb-3">💾</div>
+                            <h3 className="font-semibold text-gray-900 mb-2 text-lg">Save & Share</h3>
+                            <p className="text-gray-600 text-sm">Save your favorite looks and share them</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  
+                  {/* Footer - Only on start screen */}
+                  <Footer show={true} />
                 </motion.div>
               ) : (
                 <motion.div
@@ -816,26 +823,14 @@ const AppContent: React.FC = () => {
                   exit="exit"
                   transition={{ duration: 0.5, ease: 'easeInOut' }}
                 >
-                  <Header />
-                  
-                  {/* User Menu in Header (Top Right) */}
-                  {user && (
-                    <div className="absolute top-4 right-6 z-50">
-                      <UserMenu user={user} onLogout={handleLogout} onViewBilling={handleViewBilling} onViewUsage={handleViewUsage} onViewStyles={handleViewStyles} />
-                    </div>
-                  )}
-                  
-                  {/* Sign In Button for non-authenticated users */}
-                  {!user && (
-                    <div className="absolute top-4 right-6 z-50">
-                      <button
-                        onClick={() => setIsAuthModalOpen(true)}
-                        className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-full hover:from-purple-700 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 shadow-md text-sm"
-                      >
-                        Sign In
-                      </button>
-                    </div>
-                  )}
+                  <Header 
+                    user={user}
+                    onAuthClick={() => setIsAuthModalOpen(true)}
+                    onLogout={handleLogout}
+                    onViewBilling={handleViewBilling}
+                    onViewUsage={handleViewUsage}
+                    onViewStyles={handleViewStyles}
+                  />
                   
                   <main className="h-[calc(100vh-4rem)] relative flex flex-col md:flex-row overflow-hidden">
                     <div className="w-full h-full flex-grow flex items-center justify-center bg-white pb-16 relative">
@@ -903,7 +898,10 @@ const AppContent: React.FC = () => {
                     </aside>
                   </main>
                   
-                  <ChatFab onClick={() => setIsChatOpen(true)} />
+                  <ChatFab 
+                    onClick={() => setIsChatOpen(true)} 
+                    hideOnMobile={!isSheetCollapsed}
+                  />
                   
                   <ChatPanel 
                     isOpen={isChatOpen}
@@ -938,7 +936,6 @@ const AppContent: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-            <Footer isOnDressingScreen={!!modelImageId} />
           </div>
           )
         } />

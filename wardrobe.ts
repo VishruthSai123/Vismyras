@@ -1,219 +1,185 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
-*/
-
 import { WardrobeItem } from './types';
 
-// Default wardrobe items hosted for easy access
+// Default wardrobe items organized by Gender → Category
 export const defaultWardrobe: WardrobeItem[] = [
-  // Tops
+  // ==================== MEN'S SECTION ====================
+  
+  // MEN - TOPS
   {
-    id: 'gemini-sweat',
+    id: 'men-gemini-sweat',
     name: 'Gemini Sweat',
     url: 'https://cdn.jsdelivr.net/gh/ammaarreshi/app-images@main/gemini-sweat-2.png',
+    gender: 'Men',
     category: 'Tops',
   },
   {
-    id: 'gemini-tee',
+    id: 'men-gemini-tee',
     name: 'Gemini Tee',
     url: 'https://cdn.jsdelivr.net/gh/ammaarreshi/app-images@main/Gemini-tee.png',
+    gender: 'Men',
     category: 'Tops',
   },
   {
-    id: 'black-t-shirt',
-    name: 'Black T-Shirt',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_topwear/Black-T-Shirt-Front-Side-Photo.png',
-    category: 'Tops'
-  },
-  {
-    id: 'white-crop-top',
-    name: 'White Crop Top',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_topwear/Transparent-White-Crop-Top-PNG.png',
-    category: 'Tops'
-  },
-  // Bottoms
-  {
-    id: 'blue-jeans',
-    name: 'Blue Jeans',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_bottomwear/Blue-Jeans-PNG-Transparent-Image.png',
-    category: 'Bottoms'
-  },
-  {
-    id: 'black-jeans',
-    name: 'Black Jeans',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_bottomwear/Black-Jeans-PNG-Image.png',
-    category: 'Bottoms'
-  },
-  {
-    id: 'cargo-pants',
-    name: 'Cargo Pants',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_bottomwear/Cargo-Pants-PNG-File.png',
-    category: 'Bottoms'
-  },
-  // Dresses
-  {
-    id: 'red-dress',
-    name: 'Red Dress',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_dresses/Red-Dress-PNG-File.png',
-    category: 'Dresses'
-  },
-  {
-    id: 'floral-dress',
-    name: 'Floral Dress',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_dresses/PNG-Flower-Dress-Image.png',
-    category: 'Dresses'
-  },
-  // Outerwear
-  {
-    id: 'leather-jacket',
-    name: 'Leather Jacket',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_outerwear/Women-s-Black-Leather-Jacket-PNG-Clipart.png',
-    category: 'Outerwear'
-  },
-  {
-    id: 'denim-jacket',
-    name: 'Denim Jacket',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_outerwear/Denim-Jacket-PNG-Image.png',
-    category: 'Outerwear'
-  },
-  // Accessories
-  {
-    id: 'aviator-sunglasses',
-    name: 'Aviators',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/accessories/Aviator-Sunglasses-PNG-Image.png',
-    category: 'Accessories'
-  },
-  {
-    id: 'gold-necklace',
-    name: 'Gold Necklace',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/accessories/Gold-Necklace-PNG-Clipart.png',
-    category: 'Accessories'
-  },
-  {
-    id: 'fedora-hat',
-    name: 'Fedora Hat',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/accessories/Fedora-Hat-PNG-Clipart.png',
-    category: 'Accessories'
-  },
-   // Indian Festive
-   {
-    id: 'red-saree',
-    name: 'Red Saree',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_indian/Red-Saree-PNG-File.png',
-    category: 'Indian Festive'
-  },
-  {
-    id: 'blue-lehenga',
-    name: 'Blue Lehenga',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_indian/Transparent-Lehenga-PNG.png',
-    category: 'Indian Festive'
-  },
-  {
-    id: 'pink-kurta-set',
-    name: 'Pink Kurta Set',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_indian/Kurta-PNG-Transparent-Image.png',
-    category: 'Indian Festive'
-  },
-  // More Tops
-  {
-    id: 'white-blouse',
-    name: 'White Blouse',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_topwear/White-Blouse-PNG.png',
+    id: 'men-believe-tee',
+    name: 'Believe',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667429/Belive-Black_gxyjie.jpg',
+    gender: 'Men',
     category: 'Tops',
   },
   {
-    id: 'striped-longsleeve',
-    name: 'Striped Longsleeve',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_topwear/Striped-Longsleeve-T-Shirt.png',
+    id: 'men-alone-tee',
+    name: 'Alone',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667427/Alone-NavyBlue_zzy5u4.jpg',
+    gender: 'Men',
     category: 'Tops',
   },
   {
-    id: 'gray-hoodie',
-    name: 'Gray Hoodie',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_outerwear/Gray-Hoodie-PNG.png',
+    id: 'men-timber-tee',
+    name: 'Timberland',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667422/Mens-Short-Sleeve-Est-1973-Crew-TShirt_kk7jqs.jpg',
+    gender: 'Men',
     category: 'Tops',
   },
-
-  // More Bottoms
   {
-    id: 'denim-skirt',
-    name: 'Denim Skirt',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_bottomwear/Denim-Skirt-PNG.png',
-    category: 'Bottoms',
+    id: 'men-mike-tee',
+    name: 'Mike',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667421/il_570xN.6186976993_2q49_i2lumo.jpg',
+    gender: 'Men',
+    category: 'Tops',
   },
   {
-    id: 'black-shorts',
-    name: 'Black Shorts',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_bottomwear/Black-Shorts-PNG.png',
-    category: 'Bottoms',
+    id: 'men-california-tee',
+    name: 'California',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667426/CA-Bear-Tshirt_qzbrn9.jpg',
+    gender: 'Men',
+    category: 'Tops',
   },
   {
-    id: 'white-trousers',
-    name: 'White Trousers',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_bottomwear/White-Trousers-PNG.png',
-    category: 'Bottoms',
+    id: 'men-late-tee',
+    name: 'Late',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667426/Mens-Sorry-I-m-Late-Tshirt-Funny-Sarcastic-Sleeping-Tee-For-Guys-Graphic-Tees_e4f7ceeb-c2e3-4b54-b439-f16af455a880_1.fd91f748bb99b4599759bc38e648b046_zugllm.jpg',
+    gender: 'Men',
+    category: 'Tops',
   },
-
-  // More Dresses
   {
-    id: 'black-cocktail-dress',
-    name: 'Cocktail Dress',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_dresses/Black-Cocktail-Dress-PNG.png',
+    id: 'men-lol-tee',
+    name: 'LOL',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667428/B1pppR4gVKL._CLa_7C2140_2C2000_7C81gPus72v4L.png_7C0_2C0_2C2140_2C2000_2B0.0_2C0.0_2C2140.0_2C2000.0_AC_UY1000__rk7oja.jpg',
+    gender: 'Men',
+    category: 'Tops',
+  },
+  {
+    id: 'men-jhon-tee',
+    name: 'Jhon',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667426/SharedImage-150369_wijhqb.png',
+    gender: 'Men',
+    category: 'Tops',
+  },
+  {
+    id: 'never-give-up',
+    name: 'Never Give Up',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761667423/Never-Give-Up-TheFight_sgupre.jpg',
+    gender: 'Men',
+    category: 'Tops',
+  },
+  {
+    id: 'maroon-maxi',
+    name: 'Maxi Maroon',
+    url: 'https://res.cloudinary.com/dq0jfxccc/image/upload/v1761713943/Olyvenn-Formal-Wedding-Long-Swing-Dresses-Lace-High-Low-Bridesmaid-Dresses-Women-s-Floral-Sleeveless-Lace-Splicing-Crew-Neck-Female-Outerwear-Wine-S_2fc96978-05e8-4943-9d79-edc19a37645b.f5023742368b5716d4a9309be6e09e3d_svsllt.jpg',
+    gender: 'Women',
     category: 'Dresses',
   },
-  {
-    id: 'blue-summer-dress',
-    name: 'Summer Dress',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_dresses/Blue-Summer-Dress-PNG.png',
-    category: 'Dresses',
-  },
+  // MEN - BOTTOMS
+  // {
+  //   id: 'men-jeans-1',
+  //   name: 'Blue Jeans',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Men',
+  //   category: 'Bottoms',
+  // },
   
-  // More Outerwear
-  {
-    id: 'beige-trench-coat',
-    name: 'Trench Coat',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_outerwear/Beige-Trench-Coat-PNG.png',
-    category: 'Outerwear',
-  },
-  {
-    id: 'navy-blazer',
-    name: 'Navy Blazer',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_outerwear/Navy-Blazer-PNG.png',
-    category: 'Outerwear',
-  },
-
-  // More Accessories
-  {
-    id: 'cateye-sunglasses',
-    name: 'Cat-Eye Shades',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/accessories/Cat-Eye-Sunglasses-PNG.png',
-    category: 'Accessories',
-  },
-  {
-    id: 'pearl-earrings',
-    name: 'Pearl Earrings',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/accessories/Pearl-Earrings-PNG.png',
-    category: 'Accessories',
-  },
-  {
-    id: 'silk-scarf',
-    name: 'Silk Scarf',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/accessories/Silk-Scarf-PNG.png',
-    category: 'Accessories',
-  },
+  // MEN - OUTERWEAR
+  // {
+  //   id: 'men-jacket-1',
+  //   name: 'Black Jacket',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Men',
+  //   category: 'Outerwear',
+  // },
   
-  // More Indian Festive
+  // MEN - ACCESSORIES
+  // {
+  //   id: 'men-cap-1',
+  //   name: 'Baseball Cap',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Men',
+  //   category: 'Accessories',
+  // },
+  
+  // ==================== WOMEN'S SECTION ====================
+  
+  // WOMEN - TOPS
+  // {
+  //   id: 'women-blouse-1',
+  //   name: 'White Blouse',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Women',
+  //   category: 'Tops',
+  // },
+  
+  // WOMEN - BOTTOMS
+  // {
+  //   id: 'women-skirt-1',
+  //   name: 'Black Skirt',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Women',
+  //   category: 'Bottoms',
+  // },
+  
+  // WOMEN - DRESSES
+  // {
+  //   id: 'women-dress-1',
+  //   name: 'Summer Dress',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Women',
+  //   category: 'Dresses',
+  // },
+  
+  // WOMEN - OUTERWEAR
+  // {
+  //   id: 'women-cardigan-1',
+  //   name: 'Beige Cardigan',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Women',
+  //   category: 'Outerwear',
+  // },
+  
+  // WOMEN - ACCESSORIES
+  // {
+  //   id: 'women-scarf-1',
+  //   name: 'Silk Scarf',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Women',
+  //   category: 'Accessories',
+  // },
+  
+  // WOMEN - INDIAN FESTIVE
+  // {
+  //   id: 'women-saree-1',
+  //   name: 'Red Saree',
+  //   url: 'https://your-cdn-url.png',
+  //   gender: 'Women',
+  //   category: 'Indian Festive',
+  // },
+  
+  // ==================== TEMPLATE FOR NEW ITEMS ====================
+  /*
   {
-    id: 'yellow-anarkali',
-    name: 'Yellow Anarkali',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_indian/Yellow-Anarkali-PNG.png',
-    category: 'Indian Festive',
+    id: 'gender-category-name',  // Format: 'men-tops-1', 'women-dress-1'
+    name: 'Display Name',         // What users see
+    url: 'https://cdn-url.png',   // Direct image URL (PNG with transparent background)
+    gender: 'Men' or 'Women',     // Must be exactly 'Men' or 'Women'
+    category: 'Category',         // Options: 'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive'
   },
-  {
-    id: 'green-sharara',
-    name: 'Green Sharara',
-    url: 'https://cdn.jsdelivr.net/gh/hasan-sh/VTO-Assets@main/women_indian/Green-Sharara-PNG.png',
-    category: 'Indian Festive',
-  }
+  */
 ];

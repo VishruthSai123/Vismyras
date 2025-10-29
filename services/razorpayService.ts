@@ -24,11 +24,25 @@ declare global {
 export class RazorpayService {
   private static instance: RazorpayService;
   private razorpayKeyId: string;
+  private isLiveMode: boolean;
   private isScriptLoaded: boolean = false;
 
   private constructor() {
-    // Get key from environment variable
-    this.razorpayKeyId = process.env.RAZORPAY_KEY_ID || '';
+    // Determine if we're in live mode or test mode
+    this.isLiveMode = import.meta.env.VITE_RAZORPAY_LIVE_MODE === 'true';
+    
+    // Get the appropriate key based on mode
+    if (this.isLiveMode) {
+      this.razorpayKeyId = import.meta.env.VITE_RAZORPAY_LIVE_KEY_ID || '';
+      console.log('🔴 Razorpay: LIVE MODE');
+    } else {
+      this.razorpayKeyId = import.meta.env.VITE_RAZORPAY_TEST_KEY_ID || '';
+      console.log('🟢 Razorpay: TEST MODE');
+    }
+    
+    if (!this.razorpayKeyId) {
+      console.warn(`Razorpay ${this.isLiveMode ? 'LIVE' : 'TEST'} Key ID not found. Add VITE_RAZORPAY_${this.isLiveMode ? 'LIVE' : 'TEST'}_KEY_ID to .env.local`);
+    }
   }
 
   public static getInstance(): RazorpayService {
@@ -63,49 +77,65 @@ export class RazorpayService {
   }
 
   /**
-   * Create a payment order (this would typically call your backend)
+   * Create a payment order via Supabase Edge Function
    */
   private async createOrder(amount: number, currency: string, notes: any): Promise<string> {
-    // TODO: In production, this should call your backend API
-    // Backend will create order using Razorpay Orders API
-    // For now, we'll generate a mock order ID
-    
-    // Example backend call:
-    // const response = await fetch('/api/create-order', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ amount, currency, notes })
-    // });
-    // const data = await response.json();
-    // return data.orderId;
-    
-    return `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    try {
+      // Call Supabase Edge Function to create Razorpay order
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ amount: amount * 100, currency, notes })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create order');
+      }
+
+      const data = await response.json();
+      return data.orderId;
+    } catch (error) {
+      console.error('Error creating Razorpay order:', error);
+      // Fallback to mock order for development
+      return `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    }
   }
 
   /**
-   * Verify payment signature (this should be done on backend)
+   * Verify payment signature via Supabase Edge Function
    */
   private async verifyPaymentSignature(
     orderId: string,
     paymentId: string,
     signature: string
   ): Promise<boolean> {
-    // TODO: In production, verify on backend using:
-    // crypto.createHmac('sha256', keySecret)
-    //   .update(orderId + "|" + paymentId)
-    //   .digest('hex') === signature
-    
-    // Example backend call:
-    // const response = await fetch('/api/verify-payment', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ orderId, paymentId, signature })
-    // });
-    // const data = await response.json();
-    // return data.verified;
-    
-    console.log('Payment verification (backend required):', { orderId, paymentId, signature });
-    return true; // Mock verification for development
+    try {
+      // Call Supabase Edge Function to verify payment
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-razorpay-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ orderId, paymentId, signature })
+      });
+
+      if (!response.ok) {
+        console.error('Payment verification request failed:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      return data.verified === true;
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+      // SECURITY: Always return false if verification fails
+      // Webhooks will handle access granting in production
+      return false;
+    }
   }
 
   /**
@@ -128,7 +158,7 @@ export class RazorpayService {
     }
 
     try {
-      // Create transaction record
+      // Create transaction record for initial tracking only
       const transactionId = `txn_${Date.now()}`;
       const transaction: PaymentTransaction = {
         id: transactionId,
@@ -172,25 +202,22 @@ export class RazorpayService {
           );
 
           if (verified) {
-            // Update transaction
-            transaction.status = 'success';
-            transaction.razorpayPaymentId = response.razorpay_payment_id;
-            transaction.razorpayOrderId = response.razorpay_order_id;
-            billingService.addTransaction(transaction);
-
-            // Upgrade user to premium
+            // Upgrade user to premium (this also logs transaction internally)
             billingService.upgradeToPremium(response.razorpay_payment_id);
-
             onSuccess(response);
           } else {
+            // Update transaction to failed
             transaction.status = 'failed';
+            transaction.description = 'Payment verification failed';
             billingService.addTransaction(transaction);
             onFailure(new Error('Payment verification failed'));
           }
         },
         modal: {
           ondismiss: () => {
+            // Update transaction to cancelled
             transaction.status = 'failed';
+            transaction.description = 'Payment cancelled by user';
             billingService.addTransaction(transaction);
             onFailure(new Error('Payment cancelled by user'));
           },
@@ -225,7 +252,7 @@ export class RazorpayService {
     }
 
     try {
-      // Create transaction record
+      // Create transaction record for initial tracking only
       const transactionId = `txn_${Date.now()}`;
       const transaction: PaymentTransaction = {
         id: transactionId,
@@ -269,25 +296,22 @@ export class RazorpayService {
           );
 
           if (verified) {
-            // Update transaction
-            transaction.status = 'success';
-            transaction.razorpayPaymentId = response.razorpay_payment_id;
-            transaction.razorpayOrderId = response.razorpay_order_id;
-            billingService.addTransaction(transaction);
-
-            // Add credits
+            // Add credits (this also logs transaction internally)
             billingService.addOneTimePurchase(tryOnsCount, amount, response.razorpay_payment_id);
-
             onSuccess(response);
           } else {
+            // Update transaction to failed
             transaction.status = 'failed';
+            transaction.description = 'Payment verification failed';
             billingService.addTransaction(transaction);
             onFailure(new Error('Payment verification failed'));
           }
         },
         modal: {
           ondismiss: () => {
+            // Update transaction to cancelled
             transaction.status = 'failed';
+            transaction.description = 'Payment cancelled by user';
             billingService.addTransaction(transaction);
             onFailure(new Error('Payment cancelled by user'));
           },

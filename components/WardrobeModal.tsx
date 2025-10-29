@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React, { useState, useMemo } from 'react';
-import type { WardrobeItem } from '../types';
+import type { WardrobeItem, Gender, Category } from '../types';
 import { CheckCircleIcon, UploadCloudIcon, XIcon } from './icons';
 import { AnimatePresence, motion } from 'framer-motion';
 import { urlToFile, db, useObjectURL } from '../lib/utils';
@@ -17,12 +17,20 @@ interface WardrobePanelProps {
 
 interface CategorySelectionModalProps {
   file: File;
-  onConfirm: (category: string) => void;
+  onConfirm: (gender: Gender, category: Category) => void;
   onCancel: () => void;
-  categories: string[];
+  genders: Gender[];
+  categories: Category[];
 }
 
-const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({ file, onConfirm, onCancel, categories }) => {
+const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({ 
+  file, 
+  onConfirm, 
+  onCancel, 
+  genders, 
+  categories 
+}) => {
+  const [selectedGender, setSelectedGender] = useState<Gender | null>(null);
   const imageUrl = useMemo(() => URL.createObjectURL(file), [file]);
 
   return (
@@ -35,7 +43,9 @@ const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({ file, o
         className="relative bg-white rounded-2xl w-full max-w-md flex flex-col shadow-xl"
       >
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-xl font-serif tracking-wider text-gray-800">Select Category</h2>
+          <h2 className="text-xl font-serif tracking-wider text-gray-800">
+            {selectedGender ? 'Select Category' : 'Select Gender'}
+          </h2>
           <button onClick={onCancel} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-800">
             <XIcon className="w-6 h-6" />
           </button>
@@ -47,18 +57,48 @@ const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({ file, o
               <p className="text-xs text-gray-600 mt-1 text-center truncate max-w-[8rem]" title={file.name}>{file.name}</p>
             </div>
             <div className="flex-grow w-full">
-              <p className="text-gray-700 mb-3 font-medium">What type of garment is this?</p>
-              <div className="grid grid-cols-2 gap-2">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => onConfirm(category)}
-                    className="w-full text-center px-4 py-2 text-sm font-semibold rounded-md transition-colors bg-gray-200/80 text-gray-700 hover:bg-gray-300/80"
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
+              {!selectedGender ? (
+                <>
+                  <p className="text-gray-700 mb-3 font-medium">Who is this garment for?</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {genders.map((gender) => (
+                      <button
+                        key={gender}
+                        onClick={() => setSelectedGender(gender)}
+                        className="w-full text-center px-6 py-3 text-base font-semibold rounded-lg transition-colors bg-gray-200/80 text-gray-700 hover:bg-gray-300/80"
+                      >
+                        {gender}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-gray-700 font-medium">
+                      Gender: <span className="text-gray-900">{selectedGender}</span>
+                    </p>
+                    <button 
+                      onClick={() => setSelectedGender(null)}
+                      className="text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Change
+                    </button>
+                  </div>
+                  <p className="text-gray-700 mb-3 font-medium">What type of garment is this?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {categories.map((category) => (
+                      <button
+                        key={category}
+                        onClick={() => onConfirm(selectedGender, category)}
+                        className="w-full text-center px-4 py-2 text-sm font-semibold rounded-md transition-colors bg-gray-200/80 text-gray-700 hover:bg-gray-300/80"
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -87,34 +127,62 @@ const DBImage: React.FC<DBImageProps> = ({ src, ...props }) => {
 const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGarmentIds, isLoading, wardrobe }) => {
     const [error, setError] = useState<string | null>(null);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
-    const categories = useMemo(() => {
-        const allCategories = [...new Set(wardrobe.map(item => item.category))].sort();
-        if (allCategories.includes('Tops')) {
-            return ['Tops', ...allCategories.filter(c => c !== 'Tops')];
-        }
-        return allCategories;
+    
+    // Extract unique genders and categories
+    const genders: Gender[] = useMemo(() => {
+        const uniqueGenders = [...new Set(wardrobe.map(item => item.gender))];
+        return ['Men', 'Women'].filter(g => uniqueGenders.includes(g as Gender)) as Gender[];
     }, [wardrobe]);
-    const [activeCategory, setActiveCategory] = useState<string>(categories[0] || '');
+    
+    const categories: Category[] = useMemo(() => {
+        const allCategories = [...new Set(wardrobe.map(item => item.category))];
+        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive'];
+        return orderPriority.filter(c => allCategories.includes(c));
+    }, [wardrobe]);
+    
+    const [selectedGender, setSelectedGender] = useState<Gender>(genders[0] || 'Men');
+    const [activeCategory, setActiveCategory] = useState<Category>(categories[0] || 'Tops');
 
+    // Filter wardrobe by gender first, then by category
+    const filteredByGender = useMemo(() => 
+        wardrobe.filter(item => item.gender === selectedGender), 
+        [wardrobe, selectedGender]
+    );
+    
+    const categoriesForGender = useMemo(() => {
+        const cats = [...new Set(filteredByGender.map(item => item.category))];
+        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive'];
+        return orderPriority.filter(c => cats.includes(c));
+    }, [filteredByGender]);
+    
     const filteredWardrobe = useMemo(() => 
-        wardrobe.filter(item => item.category === activeCategory), 
-        [wardrobe, activeCategory]
+        filteredByGender.filter(item => item.category === activeCategory), 
+        [filteredByGender, activeCategory]
     );
 
+    // Update active category when gender changes
+    React.useEffect(() => {
+        if (categoriesForGender.length > 0 && !categoriesForGender.includes(activeCategory)) {
+            setActiveCategory(categoriesForGender[0]);
+        }
+    }, [categoriesForGender, activeCategory]);
+
     const handleGarmentClick = async (item: WardrobeItem) => {
-        if (isLoading || activeGarmentIds.includes(item.id)) return;
         setError(null);
         try {
-            let file: File;
-            const isDbId = !/^(https?|data):/.test(item.url);
+            // Check if it's a DB ID or external URL
+            const isDbId = !/^https?:/.test(item.url);
+            
             if (isDbId) {
+                // Custom uploaded item stored in IndexedDB
                 const blob = await db.getImage(item.url);
                 if (!blob) throw new Error(`Image not found in DB: ${item.url}`);
-                file = new File([blob], item.name, { type: blob.type });
+                const file = new File([blob], item.name, { type: blob.type });
+                onGarmentSelect(file, item);
             } else {
-                file = await urlToFile(item.url, item.name);
+                // CDN URL - pass URL string directly (no need to convert to File)
+                onGarmentSelect(item.url, item);
             }
-            onGarmentSelect(file, item);
         } catch (err) {
             const detailedError = `Failed to load wardrobe item.`;
             setError(detailedError);
@@ -135,7 +203,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
         }
     };
 
-    const handleCategoryConfirm = async (category: string) => {
+    const handleCategoryConfirm = async (gender: Gender, category: Category) => {
         if (!pendingFile) return;
 
         try {
@@ -146,11 +214,13 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
                 id: imageId,
                 name: pendingFile.name.replace(/\.[^/.]+$/, ""),
                 url: imageId,
+                gender: gender,
                 category: category,
             };
             
             onGarmentSelect(pendingFile, customGarmentInfo);
             setPendingFile(null);
+            setSelectedGender(gender);
             setActiveCategory(category);
         } catch (err) {
             setError("Could not save the uploaded file.");
@@ -177,9 +247,27 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
             </label>
         </div>
         
+        {/* Gender Selection Dropdown */}
+        {genders.length > 0 && (
+            <div className="mb-4">
+                <select
+                    value={selectedGender}
+                    onChange={(e) => setSelectedGender(e.target.value as Gender)}
+                    className="w-full px-4 py-2 text-sm font-semibold rounded-lg border-2 border-gray-300 bg-white text-gray-800 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-colors"
+                >
+                    {genders.map(gender => (
+                        <option key={gender} value={gender}>
+                            {gender}'s Collection
+                        </option>
+                    ))}
+                </select>
+            </div>
+        )}
+        
+        {/* Category Pills */}
         <div className="mb-4 overflow-x-auto pb-2 -mx-1 px-1">
             <div className="flex space-x-2">
-                {categories.map(category => (
+                {categoriesForGender.map(category => (
                     <button
                         key={category}
                         onClick={() => setActiveCategory(category)}
@@ -226,6 +314,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
                     file={pendingFile}
                     onConfirm={handleCategoryConfirm}
                     onCancel={() => setPendingFile(null)}
+                    genders={genders}
                     categories={categories}
                 />
             )}

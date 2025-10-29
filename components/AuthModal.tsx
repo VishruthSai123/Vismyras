@@ -88,20 +88,18 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setError('');
   };
 
-  if (!isOpen) return null;
-
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={handleClose}
         >
           <motion.div
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden my-8"
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -109,7 +107,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with gradient */}
-            <div className="relative bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 p-8 text-white">
+            <div className="relative bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 p-6 md:p-8 text-white">
               <button
                 onClick={handleClose}
                 className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/20 transition-colors"
@@ -122,7 +120,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
                   <Sparkles size={24} />
                 </div>
-                <h2 className="text-2xl font-bold">Vismyras</h2>
+                <h2 className="text-xl md:text-2xl font-bold">Vismyras</h2>
               </div>
               <p className="text-white/90 text-sm">
                 {mode === 'login'
@@ -131,13 +129,13 @@ const AuthModal: React.FC<AuthModalProps> = ({
               </p>
             </div>
 
-            {/* Form Content */}
-            <div className="p-8">
+            {/* Form Content - Scrollable */}
+            <div className="p-6 md:p-8 max-h-[calc(100vh-16rem)] overflow-y-auto">
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+                  className="mb-6 p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
                 >
                   {error}
                 </motion.div>
@@ -150,14 +148,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
                       Full Name
                     </label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                       <input
                         id="fullName"
                         type="text"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="John Doe"
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
                         required
                         disabled={isSubmitting}
                       />
@@ -170,14 +168,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
                       required
                       disabled={isSubmitting}
                     />
@@ -189,14 +187,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     Password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       id="password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
                       required
                       minLength={6}
                       disabled={isSubmitting}
@@ -210,7 +208,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || isLoading}
-                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-full py-2.5 md:py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white text-sm md:text-base font-semibold rounded-lg hover:from-purple-700 hover:to-pink-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {isSubmitting ? (
                     <span className="flex items-center justify-center gap-2">
@@ -252,9 +250,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 onClick={handleGoogleSignIn}
                 disabled={isSubmitting || isLoading}
-                className="w-full py-3 px-4 border-2 border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transform hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full py-2.5 md:py-3 px-4 border-2 border-gray-300 rounded-lg font-medium text-sm md:text-base text-gray-700 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transform hover:scale-[1.02] active:scale-[0.98]"
               >
-                <svg viewBox="0 0 24 24" className="w-5 h-5">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -272,7 +270,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                Sign in with Google
+                <span className="truncate">Sign in with Google</span>
               </button>
 
               {/* Toggle Mode */}
@@ -291,13 +289,13 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
               {/* Terms & Privacy */}
               {mode === 'signup' && (
-                <p className="mt-4 text-xs text-gray-500 text-center">
+                <p className="mt-4 text-xs text-gray-500 text-center leading-relaxed">
                   By creating an account, you agree to our{' '}
-                  <a href="#" className="text-purple-600 hover:underline">
+                  <a href="/terms" className="text-purple-600 hover:underline">
                     Terms of Service
                   </a>{' '}
                   and{' '}
-                  <a href="#" className="text-purple-600 hover:underline">
+                  <a href="/privacy" className="text-purple-600 hover:underline">
                     Privacy Policy
                   </a>
                 </p>

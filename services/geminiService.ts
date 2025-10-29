@@ -20,6 +20,17 @@ const fileToPart = async (file: File) => {
     return { inlineData: { mimeType, data } };
 };
 
+const urlToPart = async (url: string) => {
+    // Fetch image from URL and convert to part
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch image from ${url}: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    const file = new File([blob], 'garment', { type: blob.type });
+    return fileToPart(file);
+};
+
 const dataUrlToParts = (dataUrl: string) => {
     const arr = dataUrl.split(',');
     if (arr.length < 2) throw new Error("Invalid data URL");
@@ -83,7 +94,11 @@ export const generateModelImage = async (userImage: File): Promise<string> => {
     return handleApiResponse(response);
 };
 
-export const generateVirtualTryOnImage = async (modelImageId: string, garmentImage: File, garmentCategory: string): Promise<string> => {
+export const generateVirtualTryOnImage = async (
+    modelImageId: string, 
+    garmentImage: File | string,  // Accept both File and URL string
+    garmentCategory: string
+): Promise<string> => {
     await db.init();
     
     // Check usage limits before making API call
@@ -94,7 +109,16 @@ export const generateVirtualTryOnImage = async (modelImageId: string, garmentIma
     
     checkAllLimits(); // Check rate limits before API call
     const modelImagePart = await dbImageIdToPart(modelImageId);
-    const garmentImagePart = await fileToPart(garmentImage);
+    
+    // Handle both File and URL string for garment
+    let garmentImagePart;
+    if (typeof garmentImage === 'string') {
+        // It's a URL string - fetch and convert to part
+        garmentImagePart = await urlToPart(garmentImage);
+    } else {
+        // It's a File object
+        garmentImagePart = await fileToPart(garmentImage);
+    }
     
     const isAccessory = garmentCategory === 'Accessories';
 

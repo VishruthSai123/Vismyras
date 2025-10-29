@@ -4,14 +4,27 @@ import { ArrowLeft, Heart, Trash2, Search, Star } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import type { UserOutfit, OutfitHistoryFilters } from '../types/outfitHistory';
 import type { VismyrasUser } from '../types/auth';
+import Header from '../components/Header';
 
 interface YourStylesProps {
   user: VismyrasUser;
   onBack: () => void;
   onRestoreOutfit: (outfit: UserOutfit) => void;
+  onLogout?: () => void;
+  onViewBilling?: () => void;
+  onViewUsage?: () => void;
+  onViewStyles?: () => void;
 }
 
-export default function YourStyles({ user, onBack, onRestoreOutfit }: YourStylesProps) {
+export default function YourStyles({ 
+  user, 
+  onBack, 
+  onRestoreOutfit,
+  onLogout,
+  onViewBilling,
+  onViewUsage,
+  onViewStyles
+}: YourStylesProps) {
   const [outfits, setOutfits] = useState<UserOutfit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,25 +95,35 @@ export default function YourStyles({ user, onBack, onRestoreOutfit }: YourStyles
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 pb-20">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 flex flex-col">
+      {/* Main Header */}
+      <Header 
+        user={user}
+        onLogout={onLogout}
+        onViewBilling={onViewBilling}
+        onViewUsage={onViewUsage}
+        onViewStyles={onViewStyles}
+      />
+      
+      {/* Sub-header with back button */}
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Go back"
             >
               <ArrowLeft size={24} />
             </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Your Styles</h1>
+            <div className="flex-grow">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Your Styles</h1>
               <p className="text-sm text-gray-600">{total} saved outfit{total !== 1 ? 's' : ''}</p>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="mt-4 flex gap-3">
+          <div className="mt-4 flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <input
@@ -108,35 +131,40 @@ export default function YourStyles({ user, onBack, onRestoreOutfit }: YourStyles
                 placeholder="Search outfits..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-sm"
               />
             </div>
             <button
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
                 showFavoritesOnly
-                  ? 'bg-pink-500 text-white'
-                  : 'bg-white border hover:bg-gray-50'
+                  ? 'bg-pink-500 text-white shadow-md'
+                  : 'bg-white border border-gray-300 hover:bg-gray-50'
               }`}
             >
               <Heart size={20} className={showFavoritesOnly ? 'fill-current' : ''} />
+              <span className="text-sm">Favorites</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20">
         {isLoading && (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent" />
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent" />
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800">{error}</p>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6"
+          >
+            <p className="text-red-800 text-sm">{error}</p>
+          </motion.div>
         )}
 
         {!isLoading && outfits.length === 0 && (
@@ -147,7 +175,7 @@ export default function YourStyles({ user, onBack, onRestoreOutfit }: YourStyles
                 ? 'No outfits found'
                 : 'No saved outfits yet'}
             </h2>
-            <p className="text-gray-500">
+            <p className="text-gray-500 text-sm">
               {searchTerm || showFavoritesOnly
                 ? 'Try adjusting your filters'
                 : 'Create and save your first outfit to see it here'}
@@ -156,7 +184,7 @@ export default function YourStyles({ user, onBack, onRestoreOutfit }: YourStyles
         )}
 
         {!isLoading && outfits.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {outfits.map((outfit) => (
               <motion.div
                 key={outfit.id}

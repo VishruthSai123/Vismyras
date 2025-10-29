@@ -7,13 +7,14 @@ import { MessageSquareIcon } from './icons';
 
 interface ChatFabProps {
   onClick: () => void;
+  hideOnMobile?: boolean;
 }
 
-const ChatFab: React.FC<ChatFabProps> = ({ onClick }) => {
+const ChatFab: React.FC<ChatFabProps> = ({ onClick, hideOnMobile = false }) => {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-24 right-6 sm:bottom-8 sm:right-8 z-40 w-16 h-16 bg-gray-900 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700 active:scale-95 transition-all duration-300 ease-in-out"
+      className={`fixed bottom-24 right-6 sm:bottom-8 sm:right-8 z-40 w-16 h-16 bg-gray-900 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700 active:scale-95 transition-all duration-300 ease-in-out ${hideOnMobile ? 'hidden sm:flex' : ''}`}
       aria-label="Open chat"
     >
       <MessageSquareIcon className="w-8 h-8" />

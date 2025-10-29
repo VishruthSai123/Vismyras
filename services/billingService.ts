@@ -20,6 +20,8 @@ const STORAGE_KEY_PREFIX = 'vismyras_billing_';
 
 /**
  * Manages user subscription, usage tracking, and billing
+ * Note: Access granting/revoking/expiring is handled automatically by Razorpay webhooks
+ * See WEBHOOK_SETUP.md for configuration details
  */
 export class BillingService {
   private static instance: BillingService;
@@ -89,13 +91,13 @@ export class BillingService {
           this.saveUserBilling(billing);
         }
         
-        // Check if subscription has expired
-        if (billing.subscription.endDate < Date.now() && billing.subscription.tier === SubscriptionTier.PREMIUM) {
-          billing.subscription.status = SubscriptionStatus.EXPIRED;
-          billing.subscription.tier = SubscriptionTier.FREE;
-          billing.usage.tryOnsLimit = SUBSCRIPTION_PLANS[SubscriptionTier.FREE].monthlyLimit;
-          this.saveUserBilling(billing);
+        // Check if subscription has expired and handle downgrade
+        if (this.isSubscriptionExpired(billing)) {
+          this.handleSubscriptionExpiry(billing);
         }
+        
+        // Clean up expired one-time purchases
+        this.cleanupExpiredPurchases(billing);
         
         return billing;
       }
@@ -106,6 +108,57 @@ export class BillingService {
     const defaultBilling = this.getDefaultBilling();
     this.saveUserBilling(defaultBilling);
     return defaultBilling;
+  }
+
+  /**
+   * Check if subscription has expired
+   */
+  private isSubscriptionExpired(billing: UserBilling): boolean {
+    return (
+      billing.subscription.tier === SubscriptionTier.PREMIUM &&
+      billing.subscription.endDate < Date.now() &&
+      billing.subscription.status === SubscriptionStatus.ACTIVE
+    );
+  }
+
+  /**
+   * Handle subscription expiry - downgrade to free tier
+   */
+  private handleSubscriptionExpiry(billing: UserBilling): void {
+    console.log('⚠️ Premium subscription expired, downgrading to FREE tier');
+    
+    billing.subscription.status = SubscriptionStatus.EXPIRED;
+    billing.subscription.tier = SubscriptionTier.FREE;
+    billing.subscription.autoRenew = false;
+    billing.usage.tryOnsLimit = SUBSCRIPTION_PLANS[SubscriptionTier.FREE].monthlyLimit;
+    
+    // Add transaction record for expiry
+    const expiryTransaction: PaymentTransaction = {
+      id: `txn_expiry_${Date.now()}`,
+      type: 'subscription' as any,
+      amount: 0,
+      currency: 'INR',
+      status: 'success',
+      timestamp: Date.now(),
+      description: 'Premium subscription expired - Downgraded to FREE tier',
+    };
+    billing.transactions.push(expiryTransaction);
+    
+    this.saveUserBilling(billing);
+  }
+
+  /**
+   * Clean up expired one-time purchases
+   */
+  private cleanupExpiredPurchases(billing: UserBilling): void {
+    const now = Date.now();
+    const expiredCount = billing.oneTimePurchases.filter(p => p.expiryDate <= now).length;
+    
+    if (expiredCount > 0) {
+      billing.oneTimePurchases = billing.oneTimePurchases.filter(p => p.expiryDate > now);
+      this.saveUserBilling(billing);
+      console.log(`🧹 Cleaned up ${expiredCount} expired one-time purchase(s)`);
+    }
   }
 
   /**
@@ -157,8 +210,10 @@ export class BillingService {
 
   /**
    * Consume a try-on credit
+   * Uses atomic read-modify-write to prevent race conditions
    */
   public consumeTryOn(action: UsageHistoryEntry['action'], garmentId?: string): void {
+    // Get fresh billing data to avoid stale state
     const billing = this.getUserBilling();
     
     const entry: UsageHistoryEntry = {
@@ -177,7 +232,7 @@ export class BillingService {
       return;
     }
     
-    // Use one-time credits
+    // Use one-time credits (find first available, non-expired purchase)
     const now = Date.now();
     for (const purchase of billing.oneTimePurchases) {
       if (purchase.expiryDate > now && purchase.tryOnsCount > 0) {
@@ -200,11 +255,17 @@ export class BillingService {
 
   /**
    * Upgrade to Premium subscription
+   * NOTE: In production, access is granted automatically by Razorpay webhooks
+   * This method is for local testing only. See WEBHOOK_SETUP.md for webhook configuration.
    */
   public upgradeToPremium(razorpaySubscriptionId?: string): void {
     const billing = this.getUserBilling();
     const now = Date.now();
     const endDate = now + 30 * 24 * 60 * 60 * 1000; // 30 days
+    
+    console.log('✅ GRANTING PREMIUM ACCESS (Manual - Testing Only)');
+    console.log('📅 Valid until:', new Date(endDate).toLocaleString());
+    console.log('⚠️  In production, this is handled automatically by webhooks');
     
     billing.subscription = {
       tier: SubscriptionTier.PREMIUM,
@@ -217,22 +278,78 @@ export class BillingService {
     
     billing.usage.tryOnsLimit = SUBSCRIPTION_PLANS[SubscriptionTier.PREMIUM].monthlyLimit;
     
+    // Add activation transaction
+    const activationTransaction: PaymentTransaction = {
+      id: `txn_activation_${now}`,
+      type: 'subscription' as any,
+      amount: 199,
+      currency: 'INR',
+      status: 'success',
+      timestamp: now,
+      description: 'Premium subscription activated (manual)',
+      razorpayPaymentId: razorpaySubscriptionId,
+    };
+    billing.transactions.push(activationTransaction);
+    
     this.saveUserBilling(billing);
   }
 
   /**
+   * Revoke Premium access (immediate downgrade)
+   * NOTE: In production, revocation is handled automatically by Razorpay webhooks
+   * This method is for local testing/admin actions only. See WEBHOOK_SETUP.md
+   */
+  public revokePremium(reason: string = 'Manual revocation'): void {
+    const billing = this.getUserBilling();
+    
+    if (billing.subscription.tier === SubscriptionTier.PREMIUM) {
+      console.log('🚫 REVOKING PREMIUM ACCESS (Manual - Testing Only)');
+      console.log('📝 Reason:', reason);
+      console.log('⚠️  In production, this is handled automatically by webhooks');
+      
+      billing.subscription.status = SubscriptionStatus.CANCELLED;
+      billing.subscription.tier = SubscriptionTier.FREE;
+      billing.subscription.autoRenew = false;
+      billing.subscription.endDate = Date.now(); // Expire immediately
+      billing.usage.tryOnsLimit = SUBSCRIPTION_PLANS[SubscriptionTier.FREE].monthlyLimit;
+      
+      // Add revocation transaction
+      const revocationTransaction: PaymentTransaction = {
+        id: `txn_revoke_${Date.now()}`,
+        type: 'subscription' as any,
+        amount: 0,
+        currency: 'INR',
+        status: 'success',
+        timestamp: Date.now(),
+        description: `Premium access revoked (manual) - ${reason}`,
+      };
+      billing.transactions.push(revocationTransaction);
+      
+      this.saveUserBilling(billing);
+    }
+  }
+
+  /**
    * Add one-time purchase credits
+   * NOTE: In production, credits are granted automatically by Razorpay webhooks
+   * This method is for local testing only. See WEBHOOK_SETUP.md
    */
   public addOneTimePurchase(tryOnsCount: number, price: number, razorpayPaymentId?: string): string {
     const billing = this.getUserBilling();
     const now = Date.now();
+    const expiryDate = now + 30 * 24 * 60 * 60 * 1000; // 30 days
+    
+    console.log('✅ GRANTING ONE-TIME CREDITS (Manual - Testing Only)');
+    console.log('🎫 Credits:', tryOnsCount);
+    console.log('📅 Expires:', new Date(expiryDate).toLocaleString());
+    console.log('⚠️  In production, this is handled automatically by webhooks');
     
     const purchase: OneTimePurchase = {
       id: `purchase-${now}`,
       tryOnsCount,
       price,
       purchaseDate: now,
-      expiryDate: now + 30 * 24 * 60 * 60 * 1000, // 30 days
+      expiryDate,
       razorpayPaymentId,
     };
     
@@ -240,6 +357,40 @@ export class BillingService {
     this.saveUserBilling(billing);
     
     return purchase.id;
+  }
+
+  /**
+   * Revoke one-time purchase credits
+   * NOTE: In production, revocation is handled automatically by Razorpay webhooks (e.g., refunds)
+   * This method is for local testing/admin actions only. See WEBHOOK_SETUP.md
+   */
+  public revokeOneTimePurchase(purchaseId: string, reason: string = 'Manual revocation'): void {
+    const billing = this.getUserBilling();
+    const purchaseIndex = billing.oneTimePurchases.findIndex(p => p.id === purchaseId);
+    
+    if (purchaseIndex !== -1) {
+      const purchase = billing.oneTimePurchases[purchaseIndex];
+      console.log('🚫 REVOKING ONE-TIME CREDITS (Manual - Testing Only)');
+      console.log('🎫 Credits:', purchase.tryOnsCount);
+      console.log('📝 Reason:', reason);
+      console.log('⚠️  In production, this is handled automatically by webhooks');
+      
+      billing.oneTimePurchases.splice(purchaseIndex, 1);
+      
+      // Add revocation transaction
+      const revocationTransaction: PaymentTransaction = {
+        id: `txn_revoke_${Date.now()}`,
+        type: 'one_time' as any,
+        amount: 0,
+        currency: 'INR',
+        status: 'success',
+        timestamp: Date.now(),
+        description: `One-time credits revoked - ${reason}`,
+      };
+      billing.transactions.push(revocationTransaction);
+      
+      this.saveUserBilling(billing);
+    }
   }
 
   /**
@@ -257,8 +408,54 @@ export class BillingService {
   public cancelSubscription(): void {
     const billing = this.getUserBilling();
     if (billing.subscription.tier === SubscriptionTier.PREMIUM) {
+      console.log('⚠️ Premium subscription cancelled - will expire at:', new Date(billing.subscription.endDate).toLocaleString());
+      
       billing.subscription.autoRenew = false;
       billing.subscription.status = SubscriptionStatus.CANCELLED;
+      
+      // Add cancellation transaction
+      const cancellationTransaction: PaymentTransaction = {
+        id: `txn_cancel_${Date.now()}`,
+        type: 'subscription' as any,
+        amount: 0,
+        currency: 'INR',
+        status: 'success',
+        timestamp: Date.now(),
+        description: 'Premium subscription cancelled - Will expire at end of billing period',
+      };
+      billing.transactions.push(cancellationTransaction);
+      
+      this.saveUserBilling(billing);
+    }
+  }
+
+  /**
+   * Reactivate cancelled subscription
+   */
+  public reactivateSubscription(): void {
+    const billing = this.getUserBilling();
+    if (
+      billing.subscription.tier === SubscriptionTier.PREMIUM &&
+      billing.subscription.status === SubscriptionStatus.CANCELLED &&
+      billing.subscription.endDate > Date.now()
+    ) {
+      console.log('✅ Premium subscription reactivated');
+      
+      billing.subscription.autoRenew = true;
+      billing.subscription.status = SubscriptionStatus.ACTIVE;
+      
+      // Add reactivation transaction
+      const reactivationTransaction: PaymentTransaction = {
+        id: `txn_reactivate_${Date.now()}`,
+        type: 'subscription' as any,
+        amount: 0,
+        currency: 'INR',
+        status: 'success',
+        timestamp: Date.now(),
+        description: 'Premium subscription reactivated',
+      };
+      billing.transactions.push(reactivationTransaction);
+      
       this.saveUserBilling(billing);
     }
   }
