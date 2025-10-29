@@ -470,8 +470,14 @@ const AppContent: React.FC = () => {
         setCurrentPoseIndex(0);
         addToast('Style updated successfully! ✨', 'success', 3000);
         
+        // Consume 1 try-on credit for AI chat edit
+        refreshUsageStats();
+        
     } catch (err) {
-        if (err instanceof RateLimitError) {
+        if (err instanceof UsageLimitError) {
+            addToast(err.message, 'warning', 7000);
+            setIsPaywallOpen(true);
+        } else if (err instanceof RateLimitError) {
             addToast(err.message, 'warning', 7000);
         } else {
             const errorMsg = getFriendlyErrorMessage(err, 'Failed to apply your edit');
@@ -482,7 +488,7 @@ const AppContent: React.FC = () => {
         setIsLoading(false);
         setLoadingMessage('');
     }
-  }, [displayImageId, isLoading, currentOutfitIndex]);
+  }, [displayImageId, isLoading, currentOutfitIndex, addToast, refreshUsageStats]);
 
   // Payment handlers
   const handleSubscribe = useCallback(async (tier: SubscriptionTier) => {

@@ -174,6 +174,18 @@ export const generatePoseVariation = async (tryOnImageId: string, poseInstructio
 
 export const generateChatEdit = async (baseImageId: string, userPrompt: string, referenceImage?: File): Promise<string> => {
     await db.init();
+    
+    // Check usage limits before making the request
+    const usageCheck = billingService.canMakeRequest();
+    if (!usageCheck.allowed) {
+        throw new UsageLimitError(
+            usageCheck.reason || 'Usage limit reached',
+            usageCheck.billing.usage.tryOnsUsed,
+            usageCheck.billing.usage.tryOnsLimit,
+            usageCheck.billing.subscription.tier
+        );
+    }
+    
     checkAllLimits(); // Check rate limits before API call
     const modelImagePart = await dbImageIdToPart(baseImageId);
     
@@ -196,5 +208,9 @@ export const generateChatEdit = async (baseImageId: string, userPrompt: string, 
             responseModalities: [Modality.IMAGE, Modality.TEXT],
         },
     });
+    
+    // Consume the try-on credit after successful generation
+    billingService.consumeTryOn('chat-edit');
+    
     return handleApiResponse(response);
 };
