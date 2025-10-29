@@ -16,6 +16,7 @@ interface UsageDisplayProps {
   tier: SubscriptionTier;
   daysUntilReset: number;
   onUpgradeClick: () => void;
+  onManageSubscription?: () => void;
 }
 
 const UsageDisplay: React.FC<UsageDisplayProps> = ({
@@ -27,6 +28,7 @@ const UsageDisplay: React.FC<UsageDisplayProps> = ({
   tier,
   daysUntilReset,
   onUpgradeClick,
+  onManageSubscription,
 }) => {
   const plan = SUBSCRIPTION_PLANS[tier];
   const totalAvailable = remaining + oneTimeCredits;
@@ -164,6 +166,22 @@ const UsageDisplay: React.FC<UsageDisplayProps> = ({
             className="w-full text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 px-4 py-2 rounded-md transition-all duration-200"
           >
             Upgrade for ₹199/month
+          </button>
+        </motion.div>
+      )}
+
+      {/* Manage Subscription for Premium users */}
+      {tier === SubscriptionTier.PREMIUM && onManageSubscription && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 pt-3 border-t border-gray-200"
+        >
+          <button
+            onClick={onManageSubscription}
+            className="w-full text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-md transition-all duration-200"
+          >
+            ⚙️ Manage Subscription
           </button>
         </motion.div>
       )}

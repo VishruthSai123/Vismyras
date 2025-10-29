@@ -426,6 +426,15 @@ class SupabaseService {
 
     return data.signedUrl;
   }
+
+  /**
+   * Get current session access token
+   */
+  public async getAccessToken(): Promise<string | null> {
+    const client = this.getClient();
+    const { data: { session } } = await client.auth.getSession();
+    return session?.access_token || null;
+  }
 }
 
 export const supabaseService = SupabaseService.getInstance();

@@ -30,6 +30,7 @@ import ChatPanel from './components/ChatPanel';
 import ToastContainer, { Toast } from './components/Toast';
 import UsageDisplay from './components/UsageDisplay';
 import PaywallModal from './components/PaywallModal';
+import SubscriptionManagementModal from './components/SubscriptionManagementModal';
 import { defaultWardrobe } from './wardrobe';
 
 // Legal Pages
@@ -88,6 +89,7 @@ const AppContent: React.FC = () => {
   const [isStateLoaded, setIsStateLoaded] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [usageStats, setUsageStats] = useState(billingService.getUsageStats());
   
   // Auth state
@@ -505,6 +507,50 @@ const AppContent: React.FC = () => {
     setIsPaywallOpen(true);
   }, []);
 
+  // Subscription management handlers
+  const handleCancelSubscription = useCallback(async () => {
+    if (!user) {
+      addToast('Please sign in to manage your subscription', 'warning', 5000);
+      return;
+    }
+
+    const billing = billingService.getUserBilling();
+    if (!billing.subscription.razorpaySubscriptionId) {
+      addToast('No active subscription found', 'error', 5000);
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadingMessage('Cancelling subscription...');
+
+    await razorpayService.cancelSubscription(
+      billing.subscription.razorpaySubscriptionId,
+      user.id,
+      () => {
+        setIsLoading(false);
+        setLoadingMessage('');
+        refreshUsageStats();
+        setIsSubscriptionModalOpen(false);
+        addToast('✅ Subscription cancelled. You\'ll keep Premium access until the end of your billing period.', 'success', 8000);
+      },
+      (error) => {
+        setIsLoading(false);
+        setLoadingMessage('');
+        addToast(error.message || 'Failed to cancel subscription. Please try again.', 'error', 5000);
+      }
+    );
+  }, [addToast, refreshUsageStats, user]);
+
+  const handleReactivateSubscription = useCallback(() => {
+    billingService.reactivateSubscription();
+    refreshUsageStats();
+    addToast('✅ Subscription reactivated! Your Premium benefits will continue.', 'success', 5000);
+  }, [addToast, refreshUsageStats]);
+
+  const handleManageSubscriptionClick = useCallback(() => {
+    setIsSubscriptionModalOpen(true);
+  }, []);
+
   // Auth handlers
   const handleSignUp = useCallback(async (credentials: SignUpCredentials) => {
     try {
@@ -876,6 +922,7 @@ const AppContent: React.FC = () => {
                             tier={usageStats.tier}
                             daysUntilReset={usageStats.daysUntilReset}
                             onUpgradeClick={handleUpgradeClick}
+                            onManageSubscription={handleManageSubscriptionClick}
                           />
                           <OutfitStack 
                             outfitHistory={activeOutfitLayers}
@@ -932,6 +979,17 @@ const AppContent: React.FC = () => {
                     onSubscribe={handleSubscribe}
                     onBuyCredits={handleBuyCredits}
                     currentTier={usageStats.tier}
+                  />
+
+                  <SubscriptionManagementModal
+                    isOpen={isSubscriptionModalOpen}
+                    onClose={() => setIsSubscriptionModalOpen(false)}
+                    currentTier={usageStats.tier}
+                    subscriptionStatus={billingService.getUserBilling().subscription.status}
+                    endDate={billingService.getUserBilling().subscription.endDate}
+                    razorpaySubscriptionId={billingService.getUserBilling().subscription.razorpaySubscriptionId}
+                    onCancelSubscription={handleCancelSubscription}
+                    onReactivateSubscription={handleReactivateSubscription}
                   />
                 </motion.div>
               )}

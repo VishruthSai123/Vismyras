@@ -138,15 +138,27 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
                       </ul>
 
                       {/* CTA Button */}
-                      <button
-                        onClick={() => onSubscribe(SubscriptionTier.PREMIUM)}
-                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                      >
-                        Subscribe Now
-                      </button>
+                      {currentTier === SubscriptionTier.PREMIUM ? (
+                        <button
+                          disabled
+                          className="w-full bg-gray-300 text-gray-600 font-semibold py-3 px-6 rounded-lg cursor-not-allowed"
+                        >
+                          ✓ Using Premium
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onSubscribe(SubscriptionTier.PREMIUM)}
+                          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                        >
+                          Subscribe Now
+                        </button>
+                      )}
 
                       <p className="text-xs text-gray-500 text-center mt-3">
-                        Cancel anytime. No commitments.
+                        {currentTier === SubscriptionTier.PREMIUM 
+                          ? 'Manage your subscription in Settings'
+                          : 'Cancel anytime. No commitments.'
+                        }
                       </p>
                     </div>
 

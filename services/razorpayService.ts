@@ -10,6 +10,7 @@ import {
   PaymentTransaction,
 } from '../types/billing';
 import { billingService } from './billingService';
+import { supabaseService } from './supabaseService';
 
 declare global {
   interface Window {
@@ -322,6 +323,51 @@ export class RazorpayService {
       razorpay.open();
     } catch (error) {
       onFailure(error);
+    }
+  }
+
+  /**
+   * Cancel a Razorpay subscription
+   */
+  public async cancelSubscription(
+    subscriptionId: string,
+    userId: string,
+    onSuccess: () => void,
+    onFailure: (error: Error) => void
+  ): Promise<void> {
+    try {
+      // Get user's access token for authentication
+      const accessToken = await supabaseService.getAccessToken();
+      
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please sign in to cancel your subscription.');
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cancel-razorpay-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          subscriptionId,
+          userId,
+          cancelAtCycleEnd: true, // No refund, cancel at period end
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update local billing service
+        billingService.cancelSubscription();
+        onSuccess();
+      } else {
+        throw new Error(result.error || 'Failed to cancel subscription');
+      }
+    } catch (error) {
+      console.error('Error cancelling subscription:', error);
+      onFailure(error instanceof Error ? error : new Error('Failed to cancel subscription'));
     }
   }
 }
