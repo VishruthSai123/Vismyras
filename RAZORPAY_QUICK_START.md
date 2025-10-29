@@ -92,7 +92,7 @@ vercel env add RAZORPAY_KEY_ID production
 # Paste: rzp_live_RYrMe7EXEQ4UMt
 
 vercel env add RAZORPAY_KEY_SECRET production
-# Paste: z4QE76BS32ttCLO2cTOyH764
+# Paste: YOUR_RAZORPAY_LIVE_SECRET
 
 vercel env add RAZORPAY_WEBHOOK_SECRET production
 # Paste: <Vishruth2008>
@@ -171,3 +171,4 @@ Your backend is now live with:
 ## 📞 Need Help?
 
 See the full guide: `RAZORPAY_COMPLETE_SETUP.md`
+

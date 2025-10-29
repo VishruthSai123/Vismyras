@@ -61,7 +61,7 @@ vercel env add RAZORPAY_KEY_ID production
 # When prompted, paste: rzp_live_RYrMe7EXEQ4UMt
 
 vercel env add RAZORPAY_KEY_SECRET production
-# When prompted, paste: z4QE76BS32ttCLO2cTOyH764
+# When prompted, paste: YOUR_RAZORPAY_LIVE_SECRET
 
 vercel env add RAZORPAY_WEBHOOK_SECRET production
 # When prompted, paste: <Vishruth2008>
@@ -276,3 +276,4 @@ git add .
 git commit -m "Complete Razorpay integration"
 git push origin main
 ```
+

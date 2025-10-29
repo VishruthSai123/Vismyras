@@ -39,7 +39,7 @@ Add these to your `.env.local`:
 ```bash
 # Razorpay Keys (Already Added)
 RAZORPAY_KEY_ID=rzp_live_RYrMe7EXEQ4UMt
-RAZORPAY_KEY_SECRET=z4QE76BS32ttCLO2cTOyH764
+RAZORPAY_KEY_SECRET=YOUR_RAZORPAY_LIVE_SECRET
 
 # Razorpay Webhook Secret (Get from Razorpay Dashboard)
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret_here
@@ -153,7 +153,7 @@ const Razorpay = require('razorpay');
 
 const razorpay = new Razorpay({
   key_id: 'rzp_live_RYrMe7EXEQ4UMt',
-  key_secret: 'z4QE76BS32ttCLO2cTOyH764',
+  key_secret: 'YOUR_RAZORPAY_LIVE_SECRET',
 });
 
 async function createPlans() {
@@ -666,3 +666,4 @@ Your Razorpay integration is complete with:
 **Last Updated**: October 28, 2025  
 **Version**: 1.0  
 **Author**: Vismyras Team
+

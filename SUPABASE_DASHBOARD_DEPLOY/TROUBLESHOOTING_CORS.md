@@ -90,7 +90,7 @@ Delete and re-add each secret:
 
 3. **Add second secret**:
    - Name: `RAZORPAY_KEY_SECRET`
-   - Value: `xat1T5SykUzrUyJIaDYD1tBj`
+   - Value: `YOUR_RAZORPAY_TEST_SECRET`
    - Click Save
 
 4. **Restart function** (sometimes needed):
@@ -156,3 +156,4 @@ The new version:
 5. Browser blocks response
 
 The updated code fixes this by ALWAYS returning CORS headers, even on error!
+

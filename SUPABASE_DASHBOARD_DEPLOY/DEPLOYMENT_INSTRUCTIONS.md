@@ -9,7 +9,7 @@ Go to: **Supabase Dashboard → Settings → Edge Functions → Manage secrets**
 ### For TEST Mode (Development):
 ```
 RAZORPAY_KEY_ID = rzp_test_RZCalW8FnHhyFK
-RAZORPAY_KEY_SECRET = xat1T5SykUzrUyJIaDYD1tBj
+RAZORPAY_KEY_SECRET = YOUR_RAZORPAY_TEST_SECRET
 RAZORPAY_WEBHOOK_SECRET = <Vishruth2008>
 SUPABASE_URL = https://ltrknqshxbhmslnkpply.supabase.co
 SUPABASE_SERVICE_ROLE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cmtucXNoeGJobXNsbmtwcGx5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTY0MDU1MSwiZXhwIjoyMDc3MjE2NTUxfQ.wWvlF7zfUfaBHMh0wUFhvsxkjspk2D9FA7lL4ZpXNQQ
@@ -182,3 +182,4 @@ All files are in the `SUPABASE_DASHBOARD_DEPLOY` folder!
 **Time needed:** 10-15 minutes
 
 🚀 **You're ready to accept payments!**
+

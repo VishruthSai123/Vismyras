@@ -22,7 +22,7 @@ This guide shows you how to deploy Edge Functions directly through the Supabase 
 | Secret Name | Value | Notes |
 |-------------|-------|-------|
 | `RAZORPAY_KEY_ID` | `rzp_test_RZCalW8FnHhyFK` | From your .env.local |
-| `RAZORPAY_KEY_SECRET` | `xat1T5SykUzrUyJIaDYD1tBj` | TEST secret key from .env.local |
+| `RAZORPAY_KEY_SECRET` | `YOUR_RAZORPAY_TEST_SECRET` | TEST secret key from .env.local |
 | `RAZORPAY_WEBHOOK_SECRET` | `<Vishruth2008>` | From your .env.local |
 | `SUPABASE_URL` | `https://ltrknqshxbhmslnkpply.supabase.co` | From your .env.local |
 | `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGci...XNQQ` | Service role key from .env.local (full key needed) |
@@ -32,7 +32,7 @@ This guide shows you how to deploy Edge Functions directly through the Supabase 
 | Secret Name | Value | Notes |
 |-------------|-------|-------|
 | `RAZORPAY_KEY_ID` | `rzp_live_RYrMe7EXEQ4UMt` | LIVE mode - from .env.local |
-| `RAZORPAY_KEY_SECRET` | `z4QE76BS32ttCLO2cTOyH764` | LIVE secret key from .env.local |
+| `RAZORPAY_KEY_SECRET` | `YOUR_RAZORPAY_LIVE_SECRET` | LIVE secret key from .env.local |
 | `RAZORPAY_WEBHOOK_SECRET` | Get from Razorpay after webhook setup | Will be different for live mode |
 | `SUPABASE_URL` | `https://ltrknqshxbhmslnkpply.supabase.co` | Same as test |
 | `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGci...XNQlQ` | Same as test |
@@ -94,7 +94,7 @@ npx supabase link --project-ref ltrknqshxbhmslnkpply
 
 # Set secrets for TEST mode
 npx supabase secrets set RAZORPAY_KEY_ID=rzp_test_RZCalW8FnHhyFK
-npx supabase secrets set RAZORPAY_KEY_SECRET=xat1T5SykUzrUyJIaDYD1tBj
+npx supabase secrets set RAZORPAY_KEY_SECRET=YOUR_RAZORPAY_TEST_SECRET
 npx supabase secrets set RAZORPAY_WEBHOOK_SECRET="<Vishruth2008>"
 npx supabase secrets set SUPABASE_URL=https://ltrknqshxbhmslnkpply.supabase.co
 npx supabase secrets set SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cmtucXNoeGJobXNsbmtwcGx5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTY0MDU1MSwiZXhwIjoyMDc3MjE2NTUxfQ.wWvlF7zfUfaBHMh0wUFhvsxkjspk2D9FA7lL4ZpXNQQ
@@ -108,7 +108,7 @@ npx supabase functions deploy razorpay-webhook
 **For LIVE mode, change to:**
 ```bash
 npx supabase secrets set RAZORPAY_KEY_ID=rzp_live_RYrMe7EXEQ4UMt
-npx supabase secrets set RAZORPAY_KEY_SECRET=z4QE76BS32ttCLO2cTOyH764
+npx supabase secrets set RAZORPAY_KEY_SECRET=YOUR_RAZORPAY_LIVE_SECRET
 ```
 
 This runs the CLI without installing it permanently!
@@ -209,7 +209,7 @@ npx supabase link --project-ref ltrknqshxbhmslnkpply
 
 # Set secrets (TEST MODE - from your .env.local)
 npx supabase secrets set RAZORPAY_KEY_ID=rzp_test_RZCalW8FnHhyFK
-npx supabase secrets set RAZORPAY_KEY_SECRET=xat1T5SykUzrUyJIaDYD1tBj
+npx supabase secrets set RAZORPAY_KEY_SECRET=YOUR_RAZORPAY_TEST_SECRET
 npx supabase secrets set RAZORPAY_WEBHOOK_SECRET="<Vishruth2008>"
 npx supabase secrets set SUPABASE_URL=https://ltrknqshxbhmslnkpply.supabase.co
 npx supabase secrets set SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cmtucXNoeGJobXNsbmtwcGx5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTY0MDU1MSwiZXhwIjoyMDc3MjE2NTUxfQ.wWvlF7zfUfaBHMh0wUFhvsxkjspk2D9FA7lL4ZpXNQQ
@@ -233,3 +233,4 @@ That's it! 🚀
 6. Done!
 
 **Time needed:** 5-10 minutes
+

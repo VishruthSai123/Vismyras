@@ -66,7 +66,7 @@ npx supabase link --project-ref ltrknqshxbhmslnkpply
 ### Step 2: Set Secrets
 ```bash
 npx supabase secrets set RAZORPAY_KEY_ID=rzp_live_RYrMe7EXEQ4UMt
-npx supabase secrets set RAZORPAY_KEY_SECRET=z4QE76BS32ttCLO2cTOyH764
+npx supabase secrets set RAZORPAY_KEY_SECRET=YOUR_RAZORPAY_LIVE_SECRET
 npx supabase secrets set RAZORPAY_WEBHOOK_SECRET="<Vishruth2008>"
 ```
 
@@ -216,3 +216,4 @@ If issues persist:
    - Track conversion rates
    - Monitor failed payments
    - Revenue reporting
+

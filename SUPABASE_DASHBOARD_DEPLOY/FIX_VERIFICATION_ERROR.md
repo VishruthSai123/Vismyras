@@ -158,3 +158,4 @@ This confirms function is working!
 **Time to fix:** 5 minutes
 
 🎯 **After this fix, payments should work end-to-end!**
+

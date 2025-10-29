@@ -30,7 +30,7 @@ Set your Razorpay credentials as Supabase secrets:
 
 ```bash
 npx supabase secrets set RAZORPAY_KEY_ID=rzp_live_RYrMe7EXEQ4UMt
-npx supabase secrets set RAZORPAY_KEY_SECRET=z4QE76BS32ttCLO2cTOyH764
+npx supabase secrets set RAZORPAY_KEY_SECRET=YOUR_RAZORPAY_LIVE_SECRET
 npx supabase secrets set RAZORPAY_WEBHOOK_SECRET=<Vishruth2008>
 ```
 
@@ -96,3 +96,4 @@ If Edge Functions are complex, use Razorpay Payment Links:
 - [ ] Webhook configured (optional but recommended)
 - [ ] Error logging set up
 - [ ] Payment confirmation emails configured
+
