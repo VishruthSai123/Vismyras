@@ -19,6 +19,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose, onSubmit, isLoad
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea based on content
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value);
+    
+    // Auto-resize logic
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'; // Max 200px height
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -46,6 +59,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose, onSubmit, isLoad
     onSubmit(text, imageFile ?? undefined);
     setText('');
     handleRemoveImage();
+    
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   };
 
   return (
@@ -81,34 +99,70 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose, onSubmit, isLoad
                 </div>
             </main>
 
-            <footer className="p-4 border-t bg-gray-50 shrink-0">
-              <form onSubmit={handleSubmit} className="flex items-end gap-2">
-                <div className="flex-grow bg-white border border-gray-300 rounded-lg p-2 flex flex-col">
+            <footer className="p-4 border-t bg-white shrink-0">
+              <form onSubmit={handleSubmit} className="flex items-end gap-3">
+                {/* Attachment Button */}
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={isLoading} 
+                  className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 transition-colors mb-0.5 disabled:opacity-50"
+                  aria-label="Attach image"
+                >
+                  <PaperclipIcon className="w-6 h-6" />
+                </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  className="hidden" 
+                  id="chat-image-upload" 
+                  accept="image/*" 
+                />
+
+                {/* Input Container */}
+                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-3xl px-4 py-2.5 flex flex-col max-h-[220px]">
                   {imagePreview && (
-                    <div className="relative w-20 h-20 mb-2 self-start">
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-md" />
-                      <button type="button" onClick={handleRemoveImage} className="absolute -top-2 -right-2 bg-gray-700 text-white rounded-full p-0.5">
-                        <XIcon className="w-4 h-4" />
+                    <div className="relative w-16 h-16 mb-2 self-start">
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-lg" />
+                      <button 
+                        type="button" 
+                        onClick={handleRemoveImage} 
+                        className="absolute -top-1.5 -right-1.5 bg-gray-700 text-white rounded-full p-0.5 hover:bg-gray-900 transition-colors"
+                      >
+                        <XIcon className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   )}
-                  <div className="flex items-center">
-                    <textarea
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                      placeholder="e.g., add a pair of sunglasses..."
-                      rows={1}
-                      className="w-full resize-none border-none focus:ring-0 p-0 text-gray-800 placeholder-gray-400 bg-transparent"
-                      disabled={isLoading}
-                    />
-                  </div>
+                  <textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={handleTextChange}
+                    placeholder="Type a message"
+                    rows={1}
+                    className="w-full resize-none border-none focus:ring-0 focus:outline-none p-0 text-[15px] text-gray-800 placeholder-gray-400 bg-transparent leading-relaxed min-h-[24px] max-h-[180px] overflow-y-auto"
+                    disabled={isLoading}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                  />
                 </div>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" id="chat-image-upload" accept="image/*" />
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="p-3 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors self-end">
-                  <PaperclipIcon className="w-6 h-6" />
-                </button>
-                <button type="submit" disabled={isLoading || (!text.trim() && !imageFile)} className="p-3 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center w-12 h-12 self-end">
-                  {isLoading ? <Spinner className="w-6 h-6 text-white" /> : <SendIcon className="w-6 h-6" />}
+
+                {/* Send Button - Fixed at bottom */}
+                <button 
+                  type="submit" 
+                  disabled={isLoading || (!text.trim() && !imageFile)} 
+                  className="flex-shrink-0 p-2.5 bg-transparent text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed mb-0.5"
+                  aria-label="Send message"
+                >
+                  {isLoading ? (
+                    <Spinner className="w-6 h-6" />
+                  ) : (
+                    <SendIcon className="w-6 h-6" />
+                  )}
                 </button>
               </form>
             </footer>
