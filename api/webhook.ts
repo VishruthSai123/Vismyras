@@ -134,10 +134,13 @@ async function handlePaymentCaptured(payment: any) {
   } else if (notes.type === 'credits') {
     // Add one-time credits
     const tryOnsCount = parseInt(notes.tryOnsCount || '1');
+    const priceInINR = amount / 100; // Convert paise to INR
     
     await supabase.rpc('add_one_time_credits', {
       p_user_id: userId,
       p_credits: tryOnsCount,
+      p_payment_id: payment.id,
+      p_price: priceInINR,
     });
   }
 

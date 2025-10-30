@@ -177,22 +177,173 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Table for one-time credit purchases (separate from subscriptions)
+CREATE TABLE IF NOT EXISTS public.user_one_time_purchases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    razorpay_payment_id VARCHAR(255) NOT NULL,
+    credits_purchased INTEGER NOT NULL CHECK (credits_purchased > 0),
+    credits_remaining INTEGER NOT NULL CHECK (credits_remaining >= 0),
+    price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
+    purchase_date TIMESTAMPTZ DEFAULT NOW(),
+    expiry_date TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for one-time purchases
+CREATE INDEX IF NOT EXISTS idx_one_time_purchases_user_id ON public.user_one_time_purchases(user_id);
+CREATE INDEX IF NOT EXISTS idx_one_time_purchases_expiry ON public.user_one_time_purchases(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_one_time_purchases_payment ON public.user_one_time_purchases(razorpay_payment_id);
+
+-- Enable RLS on one-time purchases
+ALTER TABLE public.user_one_time_purchases ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can view their own purchases
+DROP POLICY IF EXISTS "Users can view own purchases" ON public.user_one_time_purchases;
+CREATE POLICY "Users can view own purchases"
+    ON public.user_one_time_purchases FOR SELECT
+    USING (auth.uid() = user_id);
+
+-- RLS Policy: Service role can manage purchases (for webhooks)
+DROP POLICY IF EXISTS "Service role can manage purchases" ON public.user_one_time_purchases;
+CREATE POLICY "Service role can manage purchases"
+    ON public.user_one_time_purchases FOR ALL
+    USING (auth.jwt()->>'role' = 'service_role');
+
+-- Auto-update updated_at for one-time purchases
+CREATE OR REPLACE FUNCTION update_one_time_purchases_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS one_time_purchases_updated_at ON public.user_one_time_purchases;
+CREATE TRIGGER one_time_purchases_updated_at
+    BEFORE UPDATE ON public.user_one_time_purchases
+    FOR EACH ROW
+    EXECUTE FUNCTION update_one_time_purchases_updated_at();
+
 -- Helper function: Add one-time credits (called by webhooks)
 CREATE OR REPLACE FUNCTION add_one_time_credits(
     p_user_id UUID,
-    p_credits INTEGER
+    p_credits INTEGER,
+    p_payment_id VARCHAR(255) DEFAULT NULL,
+    p_price DECIMAL(10, 2) DEFAULT 0
 )
-RETURNS VOID AS $$
+RETURNS UUID AS $$
+DECLARE
+    purchase_id UUID;
 BEGIN
-    -- Add credits to monthly limit temporarily
-    -- In production, you'd want a separate table for one-time purchases
-    UPDATE public.user_billing
-    SET 
-        monthly_limit = monthly_limit + p_credits,
-        updated_at = NOW()
-    WHERE user_id = p_user_id;
+    -- Insert into one_time_purchases table
+    INSERT INTO public.user_one_time_purchases (
+        user_id,
+        razorpay_payment_id,
+        credits_purchased,
+        credits_remaining,
+        price,
+        purchase_date,
+        expiry_date
+    ) VALUES (
+        p_user_id,
+        COALESCE(p_payment_id, 'manual_' || extract(epoch from now())::text),
+        p_credits,
+        p_credits,
+        p_price,
+        NOW(),
+        NOW() + INTERVAL '30 days' -- Credits expire in 30 days
+    )
+    RETURNING id INTO purchase_id;
     
-    RAISE NOTICE 'Added % one-time credits to user %', p_credits, p_user_id;
+    RAISE NOTICE 'Added % one-time credits to user % (expires in 30 days)', p_credits, p_user_id;
+    RETURN purchase_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Helper function: Get total available one-time credits for a user
+CREATE OR REPLACE FUNCTION get_available_one_time_credits(p_user_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+    total_credits INTEGER;
+BEGIN
+    SELECT COALESCE(SUM(credits_remaining), 0)
+    INTO total_credits
+    FROM public.user_one_time_purchases
+    WHERE user_id = p_user_id
+    AND expiry_date > NOW()
+    AND credits_remaining > 0;
+    
+    RETURN total_credits;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Helper function: Consume one-time credit (FIFO - first to expire used first)
+CREATE OR REPLACE FUNCTION consume_one_time_credit(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    purchase_record RECORD;
+BEGIN
+    -- Find first available credit (FIFO - first to expire used first)
+    SELECT id, credits_remaining
+    INTO purchase_record
+    FROM public.user_one_time_purchases
+    WHERE user_id = p_user_id
+    AND expiry_date > NOW()
+    AND credits_remaining > 0
+    ORDER BY expiry_date ASC
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED; -- Prevent race conditions
+    
+    IF NOT FOUND THEN
+        RETURN false; -- No credits available
+    END IF;
+    
+    -- Consume one credit
+    UPDATE public.user_one_time_purchases
+    SET credits_remaining = credits_remaining - 1
+    WHERE id = purchase_record.id;
+    
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Update increment_usage to use one-time credits if monthly limit reached
+CREATE OR REPLACE FUNCTION increment_usage(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    current_used INTEGER;
+    current_limit INTEGER;
+    one_time_available BOOLEAN;
+BEGIN
+    -- Check if usage should reset first
+    IF should_reset_monthly_usage(p_user_id) THEN
+        PERFORM reset_monthly_usage(p_user_id);
+    END IF;
+    
+    -- Get current usage
+    SELECT monthly_used, monthly_limit 
+    INTO current_used, current_limit
+    FROM public.user_billing
+    WHERE user_id = p_user_id
+    FOR UPDATE; -- Lock row to prevent race conditions
+    
+    -- Try to use monthly subscription credits first
+    IF current_used < current_limit THEN
+        UPDATE public.user_billing
+        SET 
+            monthly_used = monthly_used + 1,
+            updated_at = NOW()
+        WHERE user_id = p_user_id;
+        
+        RETURN true;
+    END IF;
+    
+    -- Monthly limit reached - try to use one-time credits
+    one_time_available := consume_one_time_credit(p_user_id);
+    
+    RETURN one_time_available;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -209,12 +360,16 @@ COMMENT ON COLUMN public.user_billing.razorpay_subscription_id IS 'Razorpay subs
 -- Grant permissions
 GRANT SELECT ON public.user_billing TO authenticated;
 GRANT ALL ON public.user_billing TO service_role;
+GRANT SELECT ON public.user_one_time_purchases TO authenticated;
+GRANT ALL ON public.user_one_time_purchases TO service_role;
 
 -- Grant execute on helper functions
 GRANT EXECUTE ON FUNCTION should_reset_monthly_usage(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION reset_monthly_usage(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION increment_usage(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION add_one_time_credits(UUID, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION add_one_time_credits(UUID, INTEGER, VARCHAR, DECIMAL) TO service_role;
+GRANT EXECUTE ON FUNCTION get_available_one_time_credits(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION consume_one_time_credit(UUID) TO authenticated;
 
 -- ============================================================================
 -- IMPORTANT: Backfill existing users

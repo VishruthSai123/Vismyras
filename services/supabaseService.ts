@@ -478,7 +478,7 @@ class SupabaseService {
       throw new Error(`Failed to load billing data: ${error.message}`);
     }
 
-    return this.dbBillingToUserBilling(data);
+    return await this.dbBillingToUserBilling(data, userId);
   }
 
   /**
@@ -517,6 +517,7 @@ class SupabaseService {
 
   /**
    * Increment usage count (atomic, race-condition safe)
+   * Automatically uses one-time credits if monthly limit reached
    */
   public async incrementUsage(userId: string): Promise<boolean> {
     const client = this.getClient();
@@ -533,11 +534,49 @@ class SupabaseService {
   }
 
   /**
+   * Get one-time purchases for a user
+   */
+  public async getOneTimePurchases(userId: string): Promise<any[]> {
+    const client = this.getClient();
+
+    const { data, error } = await client
+      .from('user_one_time_purchases')
+      .select('*')
+      .eq('user_id', userId)
+      .gt('expiry_date', new Date().toISOString())
+      .gt('credits_remaining', 0)
+      .order('expiry_date', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to load one-time purchases: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
+   * Get available one-time credits count
+   */
+  public async getAvailableOneTimeCredits(userId: string): Promise<number> {
+    const client = this.getClient();
+
+    const { data, error } = await client.rpc('get_available_one_time_credits', {
+      p_user_id: userId
+    });
+
+    if (error) {
+      throw new Error(`Failed to get one-time credits: ${error.message}`);
+    }
+
+    return data as number;
+  }
+
+  /**
    * Convert database billing record to UserBilling format
    * Database schema: monthly_limit, monthly_used, period_start, period_end
    * App format: usage { month, tryOnsUsed, tryOnsLimit, lastUpdated, history }
    */
-  public dbBillingToUserBilling(dbBilling: any): any {
+  public async dbBillingToUserBilling(dbBilling: any, userId: string): Promise<any> {
     // Convert ISO timestamps to milliseconds
     const periodStartMs = dbBilling.period_start 
       ? new Date(dbBilling.period_start).getTime()
@@ -549,6 +588,17 @@ class SupabaseService {
     // Calculate current month from period_start
     const periodStart = new Date(dbBilling.period_start || Date.now());
     const month = `${periodStart.getFullYear()}-${String(periodStart.getMonth() + 1).padStart(2, '0')}`;
+
+    // Fetch one-time purchases from database
+    const dbPurchases = await this.getOneTimePurchases(userId);
+    const oneTimePurchases = dbPurchases.map((p: any) => ({
+      id: p.id,
+      tryOnsCount: p.credits_remaining, // Remaining credits
+      price: parseFloat(p.price),
+      purchaseDate: new Date(p.purchase_date).getTime(),
+      expiryDate: new Date(p.expiry_date).getTime(),
+      razorpayPaymentId: p.razorpay_payment_id,
+    }));
 
     return {
       subscription: {
@@ -566,8 +616,8 @@ class SupabaseService {
         lastUpdated: periodStartMs,
         history: [], // History not stored in this schema
       },
-      oneTimePurchases: [], // Store in separate table if needed
-      transactions: [], // Store in separate table if needed
+      oneTimePurchases: oneTimePurchases, // From database
+      transactions: [], // Not stored in this schema
     };
   }
 }
