@@ -567,6 +567,12 @@ export class BillingService {
         // Save to localStorage for fast access
         localStorage.setItem(`${STORAGE_KEY_PREFIX}user`, JSON.stringify(dbBilling));
         console.log('✅ Billing data loaded from database');
+        console.log(`   Monthly: ${dbBilling.usage.tryOnsUsed}/${dbBilling.usage.tryOnsLimit}`);
+        console.log(`   One-time credits: ${dbBilling.oneTimePurchases.length} purchase(s)`);
+        if (dbBilling.oneTimePurchases.length > 0) {
+          const totalCredits = dbBilling.oneTimePurchases.reduce((sum: number, p: any) => sum + p.tryOnsCount, 0);
+          console.log(`   Total available credits: ${totalCredits}`);
+        }
       } else {
         // No billing data yet - use default (will be created by database trigger)
         const defaultBilling = this.getDefaultBilling();
