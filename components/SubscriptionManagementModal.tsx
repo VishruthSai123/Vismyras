@@ -16,7 +16,6 @@ interface SubscriptionManagementModalProps {
   endDate: number;
   razorpaySubscriptionId?: string;
   onCancelSubscription: () => Promise<void>;
-  onReactivateSubscription: () => void;
 }
 
 const SubscriptionManagementModal: React.FC<SubscriptionManagementModalProps> = ({
@@ -27,7 +26,6 @@ const SubscriptionManagementModal: React.FC<SubscriptionManagementModalProps> = 
   endDate,
   razorpaySubscriptionId,
   onCancelSubscription,
-  onReactivateSubscription,
 }) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -54,11 +52,6 @@ const SubscriptionManagementModal: React.FC<SubscriptionManagementModalProps> = 
     } finally {
       setIsCancelling(false);
     }
-  };
-
-  const handleReactivate = () => {
-    onReactivateSubscription();
-    setShowCancelConfirm(false);
   };
 
   return (
@@ -209,23 +202,14 @@ const SubscriptionManagementModal: React.FC<SubscriptionManagementModalProps> = 
                     )}
 
                     {/* Actions */}
-                    {isPremium && (
+                    {isPremium && !isCancelled && (
                       <div className="space-y-2.5 sm:space-y-3">
-                        {isCancelled ? (
-                          <button
-                            onClick={handleReactivate}
-                            className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-[0.98] text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base"
-                          >
-                            🔄 Reactivate Subscription
-                          </button>
-                        ) : (
-                          <button
-                            onClick={handleCancelClick}
-                            className="w-full bg-red-50 hover:bg-red-100 active:scale-[0.98] text-red-600 font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg transition-all duration-200 border border-red-200 text-sm sm:text-base"
-                          >
-                            Cancel Subscription
-                          </button>
-                        )}
+                        <button
+                          onClick={handleCancelClick}
+                          className="w-full bg-red-50 hover:bg-red-100 active:scale-[0.98] text-red-600 font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg transition-all duration-200 border border-red-200 text-sm sm:text-base"
+                        >
+                          Cancel Subscription
+                        </button>
                       </div>
                     )}
 
@@ -270,12 +254,6 @@ const SubscriptionManagementModal: React.FC<SubscriptionManagementModalProps> = 
                           <span className="leading-relaxed"><strong>No refunds</strong> will be issued for the remaining period</span>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-                      <p className="text-[11px] sm:text-xs text-blue-700 leading-relaxed">
-                        💡 <strong>Changed your mind?</strong> You can reactivate your subscription anytime before {endDateObj.toLocaleDateString()} without losing any benefits.
-                      </p>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">

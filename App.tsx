@@ -295,12 +295,36 @@ const AppContent: React.FC = () => {
     
     // Check if this is a custom item with AI prompt
     const hasAiPrompt = garmentInfo.aiPrompt && garmentInfo.aiPrompt.trim().length > 0;
+    
+    // Check if we're replacing an item of the same category
+    const isReplacement = !['Accessories'].includes(garmentInfo.category);
+    const currentHistory = outfitHistory.slice(0, currentOutfitIndex + 1);
+    
+    // Find the last item of the same category (to replace)
+    const lastSameCategoryIndex = isReplacement 
+      ? currentHistory.findLastIndex(layer => layer.garment?.category === garmentInfo.category)
+      : -1;
+    
+    // Determine base image: if replacing, use image BEFORE the last same-category item
+    let baseImageForTryOn = displayImageId;
+    if (lastSameCategoryIndex > 0) {
+      // Get the image from the layer before the item we're replacing
+      const previousLayer = currentHistory[lastSameCategoryIndex - 1];
+      const currentPoseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
+      baseImageForTryOn = previousLayer.poseImages[currentPoseInstruction] || displayImageId;
+    } else if (lastSameCategoryIndex === 0 && modelImageId) {
+      // If the item to replace is the first layer, use the base model image
+      baseImageForTryOn = modelImageId;
+    }
+    
     setLoadingMessage(
       hasAiPrompt 
         ? `✨ Applying with AI: "${garmentInfo.aiPrompt}"...` 
-        : garmentInfo.category === 'Accessories' 
-          ? `Adding ${garmentInfo.name}...` 
-          : `Putting on ${garmentInfo.name}...`
+        : lastSameCategoryIndex >= 0
+          ? `Replacing ${garmentInfo.category.toLowerCase()}...`
+          : garmentInfo.category === 'Accessories' 
+            ? `Adding ${garmentInfo.name}...` 
+            : `Putting on ${garmentInfo.name}...`
     );
 
     try {
@@ -308,10 +332,10 @@ const AppContent: React.FC = () => {
       
       // If custom item has AI prompt, use chat edit to apply with AI instructions
       if (hasAiPrompt && garmentFile instanceof File) {
-        newImageId = await generateChatEdit(displayImageId, garmentInfo.aiPrompt!, garmentFile);
+        newImageId = await generateChatEdit(baseImageForTryOn, garmentInfo.aiPrompt!, garmentFile);
       } else {
         // Standard virtual try-on
-        newImageId = await generateVirtualTryOnImage(displayImageId, garmentFile, garmentInfo.category);
+        newImageId = await generateVirtualTryOnImage(baseImageForTryOn, garmentFile, garmentInfo.category);
       }
       
       const currentPoseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
@@ -321,11 +345,26 @@ const AppContent: React.FC = () => {
         poseImages: { [currentPoseInstruction]: newImageId } 
       };
 
+      let newHistoryLength = 0;
+      
       setOutfitHistory(prevHistory => {
-        const newHistory = prevHistory.slice(0, currentOutfitIndex + 1);
-        return [...newHistory, newLayer];
+        let newHistory = prevHistory.slice(0, currentOutfitIndex + 1);
+        
+        // If replacing same category, remove the old item from history
+        if (lastSameCategoryIndex >= 0) {
+          newHistory = [
+            ...newHistory.slice(0, lastSameCategoryIndex),
+            ...newHistory.slice(lastSameCategoryIndex + 1)
+          ];
+        }
+        
+        const finalHistory = [...newHistory, newLayer];
+        newHistoryLength = finalHistory.length;
+        return finalHistory;
       });
-      setCurrentOutfitIndex(prev => prev + 1);
+      
+      // Set index to the newly added layer (last item in the array)
+      setCurrentOutfitIndex(newHistoryLength - 1);
       
       // Add to wardrobe if it's a new custom item
       setWardrobe(prev => {
@@ -620,12 +659,6 @@ const AppContent: React.FC = () => {
       }
     );
   }, [addToast, refreshUsageStats, user]);
-
-  const handleReactivateSubscription = useCallback(() => {
-    billingService.reactivateSubscription();
-    refreshUsageStats();
-    addToast('✅ Subscription reactivated! Your Premium benefits will continue.', 'success', 5000);
-  }, [addToast, refreshUsageStats]);
 
   const handleManageSubscriptionClick = useCallback(() => {
     setIsSubscriptionModalOpen(true);
@@ -1135,7 +1168,6 @@ const AppContent: React.FC = () => {
                     endDate={billingService.getUserBilling().subscription.endDate}
                     razorpaySubscriptionId={billingService.getUserBilling().subscription.razorpaySubscriptionId}
                     onCancelSubscription={handleCancelSubscription}
-                    onReactivateSubscription={handleReactivateSubscription}
                   />
                 </motion.div>
               )}

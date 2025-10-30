@@ -5,7 +5,7 @@
 
 export type Gender = 'Men' | 'Women';
 
-export type Category = 'Tops' | 'Bottoms' | 'Dresses' | 'Outerwear' | 'Accessories' | 'Indian Festive' | 'Custom';
+export type Category = 'Tops' | 'Bottoms' | 'Dresses' | 'Outerwear' | 'Accessories' | 'Indian Festive' | 'Shoes' | 'Custom';
 
 export interface WardrobeItem {
   id: string;

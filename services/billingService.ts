@@ -473,44 +473,6 @@ export class BillingService {
   }
 
   /**
-   * Reactivate cancelled subscription
-   */
-  public async reactivateSubscription(): Promise<void> {
-    const billing = this.getUserBilling();
-    if (
-      billing.subscription.tier === SubscriptionTier.PREMIUM &&
-      billing.subscription.status === SubscriptionStatus.CANCELLED &&
-      billing.subscription.endDate > Date.now()
-    ) {
-      billing.subscription.autoRenew = true;
-      billing.subscription.status = SubscriptionStatus.ACTIVE;
-      
-      // Add reactivation transaction
-      const reactivationTransaction: PaymentTransaction = {
-        id: `txn_reactivate_${Date.now()}`,
-        type: 'subscription' as any,
-        amount: 0,
-        currency: 'INR',
-        status: 'success',
-        timestamp: Date.now(),
-        description: 'Premium subscription reactivated',
-      };
-      billing.transactions.push(reactivationTransaction);
-      
-      this.saveUserBilling(billing);
-      
-      // Save to database if user is logged in
-      if (this.currentUserId) {
-        try {
-          await this.syncToSupabase(billing);
-        } catch (error) {
-          console.error('Failed to save reactivation to database:', error);
-        }
-      }
-    }
-  }
-
-  /**
    * Get usage statistics
    */
   public getUsageStats(): {

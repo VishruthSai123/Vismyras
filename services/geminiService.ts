@@ -122,14 +122,31 @@ export const generateVirtualTryOnImage = async (
     
     const isAccessory = garmentCategory === 'Accessories';
 
+    // Category-specific replacement instructions
+    const categoryInstructions: Record<string, string> = {
+        'Tops': 'FIRST completely remove any existing shirt, t-shirt, blouse, or upper body clothing. Then replace it with the new top from the garment image. The new top should be the ONLY upper body clothing visible.',
+        'Bottoms': 'FIRST completely remove any existing pants, trousers, jeans, skirt, or lower body clothing. Then replace it with the new bottom from the garment image. The new bottom should be the ONLY lower body clothing visible.',
+        'Dresses': 'FIRST completely remove the entire current outfit (both top and bottom). Then replace it with the new dress from the garment image. The dress should be the ONLY clothing item visible on the body.',
+        'Outerwear': 'FIRST completely remove any existing jacket, blazer, coat, or outer layer. Then replace it with the new outerwear from the garment image. Keep the inner clothing (shirt/top) but replace only the outer layer.',
+        'Shoes': 'FIRST completely remove any existing footwear. Then replace it with the new shoes from the garment image. The new shoes should be the ONLY footwear visible.',
+        'Indian Festive': 'FIRST completely remove the entire current outfit. Then replace it with the new traditional outfit from the garment image. The traditional outfit should be the ONLY clothing visible.',
+        'Custom': 'FIRST identify and completely remove any existing clothing that occupies the same area as the new garment. Then replace it with the new garment from the garment image.'
+    };
+
+    const categoryInstruction = categoryInstructions[garmentCategory] || categoryInstructions['Custom'];
+
     const clothingPrompt = `You are an expert virtual try-on AI. You will be given a 'model image' and a 'garment image'. Your task is to create a new photorealistic image where the person from the 'model image' is wearing the clothing from the 'garment image'.
 
+**Category: ${garmentCategory}**
+**Replacement Instructions:** ${categoryInstruction}
+
 **Crucial Rules:**
-1.  **Complete Garment Replacement:** You MUST completely REMOVE and REPLACE the clothing item worn by the person in the 'model image' with the new garment. No part of the original clothing (e.g., collars, sleeves, patterns) should be visible in the final image. For full outfits like dresses or sarees, replace the entire current outfit.
-2.  **Preserve the Model:** The person's face, hair, body shape, and pose from the 'model image' MUST remain unchanged.
-3.  **Preserve the Background:** The entire background from the 'model image' MUST be preserved perfectly.
-4.  **Apply the Garment:** Realistically fit the new garment onto the person. It should adapt to their pose with natural folds, shadows, and lighting consistent with the original scene.
-5.  **Output:** Return ONLY the final, edited image. Do not include any text.`;
+1.  **Complete Garment Replacement:** You MUST completely REMOVE and REPLACE the relevant clothing item with the new garment. No part of the original clothing in that category (e.g., old shirt collar, sleeves, patterns) should be visible in the final image.
+2.  **Clean Removal:** Before applying the new garment, ensure the old clothing in that category is completely erased. Do not leave any traces, edges, or remnants of the original item.
+3.  **Preserve the Model:** The person's face, hair, body shape, skin tone, and pose from the 'model image' MUST remain unchanged.
+4.  **Preserve the Background:** The entire background from the 'model image' MUST be preserved perfectly.
+5.  **Realistic Application:** Realistically fit the new garment onto the person. It should adapt to their pose with natural folds, wrinkles, shadows, and lighting consistent with the original scene.
+6.  **Output:** Return ONLY the final, edited image. Do not include any text.`;
 
     const accessoryPrompt = `You are an expert virtual try-on AI. You will be given a 'model image' and an 'accessory image'. Your task is to realistically ADD the accessory from the 'accessory image' onto the person in the 'model image'.
 
