@@ -201,9 +201,9 @@ export class RazorpayService {
           );
 
           if (verified) {
-            // ✅ PRODUCTION: Premium access is granted automatically by webhooks
-            // The webhook handles: subscription.activated → grant_premium_access()
-            // No need to call upgradeToPremium() here - webhooks handle it
+            // Grant premium immediately (frontend fallback for instant feedback)
+            // Webhooks will also update, ensuring consistency
+            await billingService.upgradeToPremium(response.razorpay_payment_id);
             onSuccess(response);
           } else {
             // Update transaction to failed
@@ -296,9 +296,9 @@ export class RazorpayService {
           );
 
           if (verified) {
-            // ✅ PRODUCTION: Credits are granted automatically by webhooks
-            // The webhook handles: payment.captured → add_one_time_credits()
-            // No need to call addOneTimePurchase() here - webhooks handle it
+            // Add credits immediately (frontend fallback)
+            // Webhooks will also grant credits, so this ensures instant user feedback
+            await billingService.addOneTimePurchase(tryOnsCount, amount, response.razorpay_payment_id);
             onSuccess(response);
           } else {
             // Update transaction to failed
