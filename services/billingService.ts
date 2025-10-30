@@ -351,7 +351,7 @@ export class BillingService {
    * NOTE: In production, credits are granted automatically by Razorpay webhooks
    * This method is for local testing only. See WEBHOOK_SETUP.md
    */
-  public addOneTimePurchase(tryOnsCount: number, price: number, razorpayPaymentId?: string): string {
+  public async addOneTimePurchase(tryOnsCount: number, price: number, razorpayPaymentId?: string): Promise<string> {
     const billing = this.getUserBilling();
     const now = Date.now();
     const expiryDate = now + 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -372,6 +372,23 @@ export class BillingService {
     
     billing.oneTimePurchases.push(purchase);
     this.saveUserBilling(billing);
+    
+    // Save to database if user is logged in
+    if (this.currentUserId) {
+      try {
+        const { supabaseService } = await import('./supabaseService');
+        await supabaseService.addOneTimePurchaseToDatabase(
+          this.currentUserId,
+          tryOnsCount,
+          price,
+          razorpayPaymentId || `manual-${now}`
+        );
+        console.log('✅ Credits saved to database');
+      } catch (error) {
+        console.error('Failed to save credits to database:', error);
+        // Don't throw - credits are still in localStorage for this session
+      }
+    }
     
     return purchase.id;
   }

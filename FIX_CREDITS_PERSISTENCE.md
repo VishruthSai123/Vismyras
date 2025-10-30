@@ -1,99 +1,112 @@
-# Fix Credits Persistence - Deployment Guide
+# Fix Credits Persistence - COMPLETE SOLUTION
 
 ## 🔴 CRITICAL ISSUES IDENTIFIED
 
 From your console logs:
-1. **403 Forbidden Error**: `new row violates row-level security policy for table "user_billing"`
-2. **Credits showing 0 after logout**: Despite being granted, credits not persisting
-3. **Edge Function using old schema**: Webhook using `try_ons_count` instead of `credits_remaining`
+1. **409 Conflict Error**: `duplicate key value violates unique constraint "user_billing_user_id_key"`
+2. **Credits showing 0 after logout**: Credits only saved to localStorage, not database
+3. **Upsert not working**: Missing `onConflict` parameter in Supabase upsert call
 
 ---
 
-## 🛠️ SOLUTION OVERVIEW
+## 🛠️ ROOT CAUSES & SOLUTIONS
 
-### Problem 1: RLS Policies Blocking User Inserts
-**Issue**: User can SELECT and UPDATE billing data, but cannot INSERT (upsert fails on first-time users)
+### Problem 1: Upsert Failing (409 Conflict)
+**Issue**: Supabase `upsert()` needs explicit conflict column specification
 
-**Fix**: Migration 009 adds INSERT policy for authenticated users
+**Fix**: Added `{ onConflict: 'user_id' }` parameter to upsert call in `supabaseService.ts`
 
-### Problem 2: Edge Function Schema Mismatch
-**Issue**: Edge function inserting with old column names (`try_ons_count`)
+### Problem 2: Credits Not Persisting to Database
+**Issue**: `addOneTimePurchase()` only saved to localStorage, not database
 
-**Fix**: Updated webhook function to use `add_one_time_credits()` database function
+**Fix**: Made method async and added database save via `add_one_time_credits()` function
 
-### Problem 3: Credits Not Loading After Login
-**Issue**: Database query working but UI showing 0
+### Problem 3: Missing Billing Records for Existing Users
+**Issue**: Users created before trigger existed have no `user_billing` record
 
-**Fix**: Already implemented - `loadBillingFromSupabase()` should work after RLS fix
+**Fix**: Migration 009 creates records for ALL existing users
+
+### Problem 4: Edge Function Schema Mismatch
+**Issue**: Webhook using old column names
+
+**Fix**: Updated to use `add_one_time_credits()` database function
 
 ---
 
 ## 📋 STEP-BY-STEP DEPLOYMENT
 
-### Step 1: Run Migration 009 (Fix RLS Policies)
+### Step 1: Deploy Code Changes
 
+The code has been fixed with these changes:
+
+**File 1: `services/supabaseService.ts`**
+- ✅ Added `onConflict: 'user_id'` to upsert call (fixes 409 error)
+- ✅ Added `addOneTimePurchaseToDatabase()` method
+
+**File 2: `services/billingService.ts`**
+- ✅ Made `addOneTimePurchase()` async
+- ✅ Now saves credits to database automatically
+
+**File 3: `supabase/functions/razorpay-webhook/index.ts`**
+- ✅ Updated to use `add_one_time_credits()` database function
+- ✅ Proper schema alignment
+
+Build and deploy your app:
 ```bash
-# In Supabase Dashboard > SQL Editor, run:
+npm run build
+# Deploy to Vercel/your hosting
 ```
 
+---
+
+### Step 2: Run Migration 009 (CRITICAL - Must Run First!)
+
+Go to **Supabase Dashboard → SQL Editor** and run:
+
 ```sql
--- Copy contents from: supabase/migrations/009_fix_user_billing_rls_policies.sql
+-- This migration does 3 things:
+-- 1. Creates billing records for ALL existing users (fixes 409)
+-- 2. Updates RLS policies to allow INSERT
+-- 3. Ensures trigger is active for new users
 
--- Drop existing restrictive policies
-DROP POLICY IF EXISTS "Users can update own billing" ON public.user_billing;
-
--- Create comprehensive policies for authenticated users
-CREATE POLICY "Users can insert own billing"
-    ON public.user_billing FOR INSERT
-    WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own billing"
-    ON public.user_billing FOR UPDATE
-    USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
+-- COPY ENTIRE CONTENTS FROM: 
+-- supabase/migrations/009_fix_user_billing_rls_policies.sql
 ```
 
-**Verify migration worked:**
+**Verify migration succeeded:**
 ```sql
--- Check policies are active
+-- Check all users have billing records
+SELECT COUNT(*) as total_users FROM auth.users;
+SELECT COUNT(*) as users_with_billing FROM user_billing;
+-- Both numbers should match!
+
+-- Check policies
 SELECT policyname, cmd FROM pg_policies 
-WHERE tablename = 'user_billing' AND schemaname = 'public';
+WHERE tablename = 'user_billing';
 ```
 
 Expected output:
 - `Users can insert own billing` - INSERT
-- `Users can update own billing` - UPDATE
+- `Users can update own billing` - UPDATE  
 - `Users can view own billing` - SELECT
 - `Service role can manage billing` - ALL
 
 ---
 
-### Step 2: Deploy Updated Edge Function
+### Step 3: Deploy Updated Edge Function
 
-**Option A: Using Supabase CLI**
 ```bash
-cd c:\Users\VISHRUTH\Vismyras\Vismyras
-
-# Deploy the updated webhook function
+# Using Supabase CLI
 supabase functions deploy razorpay-webhook
 ```
 
-**Option B: Manual Deployment via Dashboard**
-1. Go to Supabase Dashboard → Edge Functions
-2. Find `razorpay-webhook`
-3. Click "Deploy new version"
-4. Copy contents from `supabase/functions/razorpay-webhook/index.ts`
-5. Deploy
-
 **Verify deployment:**
-```bash
-# Check function logs in Supabase Dashboard
-# Look for: "✅ GRANTING X ONE-TIME CREDITS"
-```
+- Check Supabase Dashboard → Edge Functions → razorpay-webhook
+- Look for recent deployment timestamp
 
 ---
 
-### Step 3: Test Credit Purchase Flow
+### Step 4: Test Complete Flow
 
 1. **Login to your app**
 2. **Open browser console** (F12)

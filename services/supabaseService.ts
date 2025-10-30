@@ -508,6 +508,9 @@ class SupabaseService {
         period_end: periodEnd,
         razorpay_subscription_id: billingData.subscription.razorpaySubscriptionId || null,
         subscription_auto_renew: billingData.subscription.autoRenew,
+      }, {
+        onConflict: 'user_id', // Specify conflict column for upsert
+        ignoreDuplicates: false, // Update on conflict, don't ignore
       });
 
     if (error) {
@@ -571,6 +574,32 @@ class SupabaseService {
     }
 
     return data as number;
+  }
+
+  /**
+   * Add one-time purchase to database
+   * Used when user manually buys credits (calls database function)
+   */
+  public async addOneTimePurchaseToDatabase(
+    userId: string,
+    creditsCount: number,
+    price: number,
+    paymentId: string
+  ): Promise<string> {
+    const client = this.getClient();
+
+    const { data, error } = await client.rpc('add_one_time_credits', {
+      p_user_id: userId,
+      p_credits: creditsCount,
+      p_payment_id: paymentId,
+      p_price: price
+    });
+
+    if (error) {
+      throw new Error(`Failed to add one-time purchase: ${error.message}`);
+    }
+
+    return data as string; // Returns purchase ID
   }
 
   /**
