@@ -147,16 +147,16 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
 /**
  * Pay-per-use pricing
  */
-export const PAY_PER_USE_PRICE = 9; // INR per try-on (competitive with market)
+export const PAY_PER_USE_PRICE = 9; // INR per try-on (base price)
 
 /**
  * One-time purchase options
- * Market-competitive pricing: ₹9 base, discounts for bulk
+ * Affordable pricing for all users
  */
 export const ONE_TIME_PACKAGES = [
-  { tryOns: 10, price: 79, popular: false, savings: 11 }, // ₹8 per try-on (12% off)
-  { tryOns: 25, price: 179, popular: true, savings: 46 }, // ₹7 per try-on (22% off)
-  { tryOns: 50, price: 299, popular: false, savings: 151 }, // ₹6 per try-on (33% off)
+  { tryOns: 5, price: 39, popular: false, savings: 6 }, // ₹7.80 per try-on (13% off)
+  { tryOns: 10, price: 79, popular: true, savings: 11 }, // ₹7.90 per try-on (12% off)
+  { tryOns: 25, price: 119, popular: false, savings: 106 }, // ₹4.76 per try-on (47% off)
 ];
 
 /**
