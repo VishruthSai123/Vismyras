@@ -190,7 +190,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
     
     const categories: Category[] = useMemo(() => {
         const allCategories = [...new Set(wardrobe.map(item => item.category))];
-        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive', 'Custom'];
+        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Shoes', 'Accessories', 'Indian Festive', 'Custom'];
         return orderPriority.filter(c => allCategories.includes(c));
     }, [wardrobe]);
     
@@ -205,7 +205,7 @@ const WardrobePanel: React.FC<WardrobePanelProps> = ({ onGarmentSelect, activeGa
     
     const categoriesForGender = useMemo(() => {
         const cats = [...new Set(filteredByGender.map(item => item.category))];
-        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Indian Festive', 'Custom'];
+        const orderPriority: Category[] = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Shoes', 'Accessories', 'Indian Festive', 'Custom'];
         return orderPriority.filter(c => cats.includes(c));
     }, [filteredByGender]);
     

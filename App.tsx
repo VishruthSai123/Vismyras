@@ -300,16 +300,16 @@ const AppContent: React.FC = () => {
     const canStack = garmentInfo.category === 'Accessories';
     const currentHistory = outfitHistory.slice(0, currentOutfitIndex + 1);
     
-    // Find if there's already an item of the same category
+    // ALWAYS use the current visible image as base
+    // The AI will intelligently replace only the target category while preserving others
+    const baseImageForTryOn = displayImageId!;
+    
+    // Check if we're replacing an item in the same category
     const lastSameCategoryIndex = canStack 
       ? -1 // Accessories always stack, never replace
       : currentHistory.findLastIndex(layer => layer.garment?.category === garmentInfo.category);
     
     const isReplacing = lastSameCategoryIndex >= 0;
-    
-    // ALWAYS use the current visible image as base
-    // The AI will intelligently replace only the target category while preserving others
-    const baseImageForTryOn = displayImageId!;
     
     setLoadingMessage(
       hasAiPrompt 
@@ -340,23 +340,14 @@ const AppContent: React.FC = () => {
       };
 
       setOutfitHistory(prevHistory => {
-        let newHistory = prevHistory.slice(0, currentOutfitIndex + 1);
-        
-        if (isReplacing) {
-          // REPLACING: Update the layer in-place (AI preserves other clothing)
-          newHistory = newHistory.map((layer, index) => 
-            index === lastSameCategoryIndex ? newLayer : layer
-          );
-        } else {
-          // ADDING: Stack on top of current outfit
-          newHistory = [...newHistory, newLayer];
-        }
-        
-        return newHistory;
+        // ALWAYS create a new layer (+1), never replace existing layers
+        // The AI already handled the visual replacement intelligently
+        const newHistory = prevHistory.slice(0, currentOutfitIndex + 1);
+        return [...newHistory, newLayer];
       });
       
-      // Set index to show the new/updated layer
-      setCurrentOutfitIndex(isReplacing ? lastSameCategoryIndex : currentOutfitIndex + 1);
+      // Set index to show the newly added layer
+      setCurrentOutfitIndex(currentOutfitIndex + 1);
       
       // Add to wardrobe if it's a new custom item
       setWardrobe(prev => {
