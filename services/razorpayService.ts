@@ -201,10 +201,9 @@ export class RazorpayService {
           );
 
           if (verified) {
-            // Upgrade user to premium (this also logs transaction internally)
-            billingService.upgradeToPremium(response.razorpay_payment_id).catch(err => {
-              console.error('Failed to upgrade to premium:', err);
-            });
+            // ✅ PRODUCTION: Premium access is granted automatically by webhooks
+            // The webhook handles: subscription.activated → grant_premium_access()
+            // No need to call upgradeToPremium() here - webhooks handle it
             onSuccess(response);
           } else {
             // Update transaction to failed
@@ -297,8 +296,9 @@ export class RazorpayService {
           );
 
           if (verified) {
-            // Add credits (this also logs transaction internally)
-            billingService.addOneTimePurchase(tryOnsCount, amount, response.razorpay_payment_id);
+            // ✅ PRODUCTION: Credits are granted automatically by webhooks
+            // The webhook handles: payment.captured → add_one_time_credits()
+            // No need to call addOneTimePurchase() here - webhooks handle it
             onSuccess(response);
           } else {
             // Update transaction to failed

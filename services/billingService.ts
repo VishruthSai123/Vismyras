@@ -117,8 +117,6 @@ export class BillingService {
    * Handle subscription expiry - downgrade to free tier
    */
   private handleSubscriptionExpiry(billing: UserBilling): void {
-    console.log('⚠️ Premium subscription expired, downgrading to FREE tier');
-    
     billing.subscription.status = SubscriptionStatus.EXPIRED;
     billing.subscription.tier = SubscriptionTier.FREE;
     billing.subscription.autoRenew = false;
@@ -280,10 +278,6 @@ export class BillingService {
     const now = Date.now();
     const endDate = now + 30 * 24 * 60 * 60 * 1000; // 30 days
     
-    console.log('✅ GRANTING PREMIUM ACCESS (Manual - Testing Only)');
-    console.log('📅 Valid until:', new Date(endDate).toLocaleString());
-    console.log('⚠️  In production, this is handled automatically by webhooks');
-    
     billing.subscription = {
       tier: SubscriptionTier.PREMIUM,
       status: SubscriptionStatus.ACTIVE,
@@ -331,10 +325,6 @@ export class BillingService {
     const billing = this.getUserBilling();
     
     if (billing.subscription.tier === SubscriptionTier.PREMIUM) {
-      console.log('🚫 REVOKING PREMIUM ACCESS (Manual - Testing Only)');
-      console.log('📝 Reason:', reason);
-      console.log('⚠️  In production, this is handled automatically by webhooks');
-      
       billing.subscription.status = SubscriptionStatus.CANCELLED;
       billing.subscription.tier = SubscriptionTier.FREE;
       billing.subscription.autoRenew = false;
@@ -377,11 +367,6 @@ export class BillingService {
     const now = Date.now();
     const expiryDate = now + 30 * 24 * 60 * 60 * 1000; // 30 days
     
-    console.log('✅ GRANTING ONE-TIME CREDITS (Manual - Testing Only)');
-    console.log('🎫 Credits:', tryOnsCount);
-    console.log('📅 Expires:', new Date(expiryDate).toLocaleString());
-    console.log('⚠️  In production, this is handled automatically by webhooks');
-    
     const purchase: OneTimePurchase = {
       id: `purchase-${now}`,
       tryOnsCount,
@@ -404,7 +389,6 @@ export class BillingService {
           price,
           razorpayPaymentId || `manual-${now}`
         );
-        console.log('✅ Credits saved to database');
       } catch (error) {
         console.error('Failed to save credits to database:', error);
         // Don't throw - credits are still in localStorage for this session
@@ -425,10 +409,6 @@ export class BillingService {
     
     if (purchaseIndex !== -1) {
       const purchase = billing.oneTimePurchases[purchaseIndex];
-      console.log('🚫 REVOKING ONE-TIME CREDITS (Manual - Testing Only)');
-      console.log('🎫 Credits:', purchase.tryOnsCount);
-      console.log('📝 Reason:', reason);
-      console.log('⚠️  In production, this is handled automatically by webhooks');
       
       billing.oneTimePurchases.splice(purchaseIndex, 1);
       
@@ -463,8 +443,6 @@ export class BillingService {
   public async cancelSubscription(): Promise<void> {
     const billing = this.getUserBilling();
     if (billing.subscription.tier === SubscriptionTier.PREMIUM) {
-      console.log('⚠️ Premium subscription cancelled - will expire at:', new Date(billing.subscription.endDate).toLocaleString());
-      
       billing.subscription.autoRenew = false;
       billing.subscription.status = SubscriptionStatus.CANCELLED;
       
@@ -504,8 +482,6 @@ export class BillingService {
       billing.subscription.status === SubscriptionStatus.CANCELLED &&
       billing.subscription.endDate > Date.now()
     ) {
-      console.log('✅ Premium subscription reactivated');
-      
       billing.subscription.autoRenew = true;
       billing.subscription.status = SubscriptionStatus.ACTIVE;
       
@@ -527,7 +503,6 @@ export class BillingService {
       if (this.currentUserId) {
         try {
           await this.syncToSupabase(billing);
-          console.log('✅ Subscription reactivation saved to database');
         } catch (error) {
           console.error('Failed to save reactivation to database:', error);
         }
@@ -624,18 +599,10 @@ export class BillingService {
       if (dbBilling) {
         // Save to localStorage for fast access
         localStorage.setItem(`${STORAGE_KEY_PREFIX}user`, JSON.stringify(dbBilling));
-        console.log('✅ Billing data loaded from database');
-        console.log(`   Monthly: ${dbBilling.usage.tryOnsUsed}/${dbBilling.usage.tryOnsLimit}`);
-        console.log(`   One-time credits: ${dbBilling.oneTimePurchases.length} purchase(s)`);
-        if (dbBilling.oneTimePurchases.length > 0) {
-          const totalCredits = dbBilling.oneTimePurchases.reduce((sum: number, p: any) => sum + p.tryOnsCount, 0);
-          console.log(`   Total available credits: ${totalCredits}`);
-        }
       } else {
         // No billing data yet - use default (will be created by database trigger)
         const defaultBilling = this.getDefaultBilling();
         this.saveUserBilling(defaultBilling);
-        console.log('✅ Initialized default billing data');
       }
     } catch (err) {
       console.error('Failed to load billing from Supabase:', err);

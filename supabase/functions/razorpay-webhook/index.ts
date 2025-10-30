@@ -39,11 +39,11 @@ async function grantPremiumAccess(userId: string, subscriptionId: string, endDat
     throw error;
   }
 
-  // Update usage limit
+  // Update usage limit (using monthly_limit for migration 007 schema)
   await supabase
     .from('user_billing')
     .update({
-      usage_limit: 50, // Premium limit - 50 try-ons per month
+      monthly_limit: 50, // Premium limit - 50 try-ons per month
     })
     .eq('user_id', userId);
 
@@ -71,11 +71,11 @@ async function revokePremiumAccess(userId: string, reason: string) {
     throw error;
   }
 
-  // Update usage limit to free tier
+  // Update usage limit to free tier (using monthly_limit for migration 007 schema)
   await supabase
     .from('user_billing')
     .update({
-      usage_limit: 10, // Free limit
+      monthly_limit: 10, // Free limit
     })
     .eq('user_id', userId);
 
