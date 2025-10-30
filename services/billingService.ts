@@ -275,7 +275,7 @@ export class BillingService {
    * NOTE: In production, access is granted automatically by Razorpay webhooks
    * This method is for local testing only. See WEBHOOK_SETUP.md for webhook configuration.
    */
-  public upgradeToPremium(razorpaySubscriptionId?: string): void {
+  public async upgradeToPremium(razorpaySubscriptionId?: string): Promise<void> {
     const billing = this.getUserBilling();
     const now = Date.now();
     const endDate = now + 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -309,6 +309,17 @@ export class BillingService {
     billing.transactions.push(activationTransaction);
     
     this.saveUserBilling(billing);
+    
+    // Save to database if user is logged in
+    if (this.currentUserId) {
+      try {
+        await this.syncToSupabase(billing);
+        console.log('✅ Premium subscription saved to database');
+      } catch (error) {
+        console.error('Failed to save premium subscription to database:', error);
+        // Don't throw - subscription is still in localStorage for this session
+      }
+    }
   }
 
   /**
@@ -316,7 +327,7 @@ export class BillingService {
    * NOTE: In production, revocation is handled automatically by Razorpay webhooks
    * This method is for local testing/admin actions only. See WEBHOOK_SETUP.md
    */
-  public revokePremium(reason: string = 'Manual revocation'): void {
+  public async revokePremium(reason: string = 'Manual revocation'): Promise<void> {
     const billing = this.getUserBilling();
     
     if (billing.subscription.tier === SubscriptionTier.PREMIUM) {
@@ -343,6 +354,16 @@ export class BillingService {
       billing.transactions.push(revocationTransaction);
       
       this.saveUserBilling(billing);
+      
+      // Save to database if user is logged in
+      if (this.currentUserId) {
+        try {
+          await this.syncToSupabase(billing);
+          console.log('✅ Premium revocation saved to database');
+        } catch (error) {
+          console.error('Failed to save premium revocation to database:', error);
+        }
+      }
     }
   }
 
@@ -439,7 +460,7 @@ export class BillingService {
   /**
    * Cancel Premium subscription (downgrade to Free at end of period)
    */
-  public cancelSubscription(): void {
+  public async cancelSubscription(): Promise<void> {
     const billing = this.getUserBilling();
     if (billing.subscription.tier === SubscriptionTier.PREMIUM) {
       console.log('⚠️ Premium subscription cancelled - will expire at:', new Date(billing.subscription.endDate).toLocaleString());
@@ -460,13 +481,23 @@ export class BillingService {
       billing.transactions.push(cancellationTransaction);
       
       this.saveUserBilling(billing);
+      
+      // Save to database if user is logged in
+      if (this.currentUserId) {
+        try {
+          await this.syncToSupabase(billing);
+          console.log('✅ Subscription cancellation saved to database');
+        } catch (error) {
+          console.error('Failed to save cancellation to database:', error);
+        }
+      }
     }
   }
 
   /**
    * Reactivate cancelled subscription
    */
-  public reactivateSubscription(): void {
+  public async reactivateSubscription(): Promise<void> {
     const billing = this.getUserBilling();
     if (
       billing.subscription.tier === SubscriptionTier.PREMIUM &&
@@ -491,6 +522,16 @@ export class BillingService {
       billing.transactions.push(reactivationTransaction);
       
       this.saveUserBilling(billing);
+      
+      // Save to database if user is logged in
+      if (this.currentUserId) {
+        try {
+          await this.syncToSupabase(billing);
+          console.log('✅ Subscription reactivation saved to database');
+        } catch (error) {
+          console.error('Failed to save reactivation to database:', error);
+        }
+      }
     }
   }
 

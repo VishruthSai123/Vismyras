@@ -202,7 +202,9 @@ export class RazorpayService {
 
           if (verified) {
             // Upgrade user to premium (this also logs transaction internally)
-            billingService.upgradeToPremium(response.razorpay_payment_id);
+            billingService.upgradeToPremium(response.razorpay_payment_id).catch(err => {
+              console.error('Failed to upgrade to premium:', err);
+            });
             onSuccess(response);
           } else {
             // Update transaction to failed
@@ -357,8 +359,8 @@ export class RazorpayService {
       const result = await response.json();
 
       if (result.success) {
-        // Update local billing service
-        billingService.cancelSubscription();
+        // Update local billing service (now async)
+        await billingService.cancelSubscription();
         onSuccess();
       } else {
         throw new Error(result.error || 'Failed to cancel subscription');
