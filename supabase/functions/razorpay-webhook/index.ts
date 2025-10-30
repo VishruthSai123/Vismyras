@@ -183,23 +183,26 @@ async function handlePaymentEvent(event: any) {
   if (event.event === 'payment.captured') {
     // Payment successful
     if (type === 'credits') {
-      // Grant one-time credits
-      const tryOnsCount = parseInt(notes.tryOnsCount || '50');
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 30); // 30 days from now
+      // Grant one-time credits using the database function
+      const creditsCount = parseInt(notes.creditsCount || '10');
+      
+      console.log(`✅ GRANTING ${creditsCount} ONE-TIME CREDITS to user ${userId}`);
+      console.log(`💰 Amount paid: ₹${amount}`);
 
-      console.log(`✅ GRANTING ${tryOnsCount} ONE-TIME CREDITS to user ${userId}`);
-
-      await supabase.from('user_one_time_purchases').insert({
-        user_id: userId,
-        razorpay_payment_id: paymentId,
-        try_ons_count: tryOnsCount,
-        price: amount,
-        purchase_date: new Date().toISOString(),
-        expiry_date: expiryDate.toISOString(),
+      // Use the database function add_one_time_credits()
+      const { data, error } = await supabase.rpc('add_one_time_credits', {
+        p_user_id: userId,
+        p_credits: creditsCount,
+        p_payment_id: paymentId,
+        p_price: amount
       });
 
-      console.log(`✅ Credits granted, expires: ${expiryDate.toISOString()}`);
+      if (error) {
+        console.error('Error granting credits:', error);
+        throw error;
+      }
+
+      console.log(`✅ Credits granted (purchase_id: ${data}), expires in 30 days`);
     }
   } else if (event.event === 'payment.failed') {
     console.log(`❌ Payment failed for user ${userId}`);
@@ -244,13 +247,18 @@ async function handleRefundEvent(event: any) {
   });
 
   if (type === 'credits') {
-    // Revoke one-time credits
+    // Revoke one-time credits by setting remaining to 0
     console.log(`🚫 REVOKING CREDITS for user ${userId} due to refund`);
     
     await supabase
       .from('user_one_time_purchases')
-      .delete()
+      .update({ 
+        credits_remaining: 0,
+        updated_at: new Date().toISOString() 
+      })
       .eq('razorpay_payment_id', paymentId);
+    
+    console.log(`✅ Credits revoked (set to 0) for payment ${paymentId}`);
   } else if (type === 'subscription') {
     // Revoke premium access
     await revokePremiumAccess(userId, 'Refund processed');
