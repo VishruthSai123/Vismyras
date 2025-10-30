@@ -9,10 +9,22 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Razorpay from 'razorpay';
 
+// Determine if we're in live mode
+const isLiveMode = process.env.VITE_RAZORPAY_LIVE_MODE === 'true';
+
+// Get appropriate keys based on mode
+const keyId = isLiveMode 
+  ? process.env.VITE_RAZORPAY_LIVE_KEY_ID 
+  : process.env.VITE_RAZORPAY_TEST_KEY_ID;
+
+const keySecret = isLiveMode
+  ? process.env.RAZORPAY_LIVE_KEY_SECRET
+  : process.env.RAZORPAY_TEST_KEY_SECRET;
+
 // Initialize Razorpay instance
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
+  key_id: keyId!,
+  key_secret: keySecret!,
 });
 
 export default async function handler(

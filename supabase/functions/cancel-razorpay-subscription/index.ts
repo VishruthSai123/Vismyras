@@ -5,8 +5,16 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const RAZORPAY_KEY_ID = Deno.env.get('VITE_RAZORPAY_LIVE_KEY_ID')
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_LIVE_KEY_SECRET')
+// Get Razorpay credentials based on mode
+const isLiveMode = Deno.env.get('VITE_RAZORPAY_LIVE_MODE') === 'true'
+
+const RAZORPAY_KEY_ID = isLiveMode
+  ? Deno.env.get('VITE_RAZORPAY_LIVE_KEY_ID')
+  : Deno.env.get('VITE_RAZORPAY_TEST_KEY_ID')
+
+const RAZORPAY_KEY_SECRET = isLiveMode
+  ? Deno.env.get('RAZORPAY_LIVE_KEY_SECRET')
+  : Deno.env.get('RAZORPAY_TEST_KEY_SECRET')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

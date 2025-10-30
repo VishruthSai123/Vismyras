@@ -205,8 +205,16 @@ export class RazorpayService {
         throw new Error('User not authenticated');
       }
 
-      // Create Razorpay subscription (recurring) - requires plan_id from Razorpay dashboard
-      const RAZORPAY_PLAN_ID = import.meta.env.VITE_RAZORPAY_PLAN_ID || 'plan_PremiumMonthly';
+      // Get plan ID based on mode
+      const isLiveMode = import.meta.env.VITE_RAZORPAY_LIVE_MODE === 'true';
+      const RAZORPAY_PLAN_ID = isLiveMode
+        ? import.meta.env.VITE_RAZORPAY_LIVE_PREMIUM_PLAN_ID
+        : import.meta.env.VITE_RAZORPAY_TEST_PREMIUM_PLAN_ID;
+
+      if (!RAZORPAY_PLAN_ID) {
+        throw new Error('Razorpay plan ID not configured');
+      }
+
       const subscriptionId = await this.createSubscription(RAZORPAY_PLAN_ID, userId);
 
       // Razorpay options for subscription

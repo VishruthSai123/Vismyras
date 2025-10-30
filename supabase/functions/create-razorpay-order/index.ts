@@ -23,12 +23,19 @@ serve(async (req) => {
       )
     }
 
-    // Get Razorpay credentials from environment
-    const RAZORPAY_KEY_ID = Deno.env.get('VITE_RAZORPAY_LIVE_KEY_ID')
-    const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_LIVE_KEY_SECRET')
+    // Get Razorpay credentials from environment based on mode
+    const isLiveMode = Deno.env.get('VITE_RAZORPAY_LIVE_MODE') === 'true'
+    
+    const RAZORPAY_KEY_ID = isLiveMode
+      ? Deno.env.get('VITE_RAZORPAY_LIVE_KEY_ID')
+      : Deno.env.get('VITE_RAZORPAY_TEST_KEY_ID')
+    
+    const RAZORPAY_KEY_SECRET = isLiveMode
+      ? Deno.env.get('RAZORPAY_LIVE_KEY_SECRET')
+      : Deno.env.get('RAZORPAY_TEST_KEY_SECRET')
 
     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-      throw new Error('Razorpay credentials not configured')
+      throw new Error(`Razorpay credentials not configured for ${isLiveMode ? 'LIVE' : 'TEST'} mode`)
     }
 
     // Create Razorpay order
