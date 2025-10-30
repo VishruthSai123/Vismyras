@@ -127,7 +127,7 @@ const AppContent: React.FC = () => {
     }, 10000);
     
     // Subscribe to auth changes
-    const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
+    const unsubscribe = supabaseService.onAuthStateChange(async (newUser) => {
       if (!mounted) return;
       
       setUser(newUser);
@@ -135,10 +135,12 @@ const AppContent: React.FC = () => {
       clearTimeout(timeout);
       
       if (newUser) {
-        billingService.setCurrentUser(newUser.auth.id);
+        // Load billing data from database
+        await billingService.setCurrentUser(newUser.auth.id);
         refreshUsageStats();
       } else {
-        billingService.setCurrentUser(null);
+        // Clear billing data on logout
+        await billingService.setCurrentUser(null);
         billingService.resetBilling();
         refreshUsageStats();
       }

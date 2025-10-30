@@ -454,6 +454,122 @@ class SupabaseService {
     const { data: { session } } = await client.auth.getSession();
     return session?.access_token || null;
   }
+
+  // ==================== BILLING METHODS ====================
+
+  /**
+   * Get user billing data from database
+   * Schema: monthly_limit, monthly_used, period_start, period_end (matches webhook)
+   */
+  public async getUserBilling(userId: string): Promise<any | null> {
+    const client = this.getClient();
+
+    const { data, error } = await client
+      .from('user_billing')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No billing record found - will be created by trigger on_user_created
+        return null;
+      }
+      throw new Error(`Failed to load billing data: ${error.message}`);
+    }
+
+    return this.dbBillingToUserBilling(data);
+  }
+
+  /**
+   * Save user billing data to database
+   * Schema: monthly_limit, monthly_used, period_start, period_end (matches webhook)
+   */
+  public async saveUserBilling(userId: string, billingData: any): Promise<void> {
+    const client = this.getClient();
+
+    // Convert millisecond timestamps to ISO format for PostgreSQL TIMESTAMPTZ
+    const periodStart = billingData.usage.lastUpdated 
+      ? new Date(billingData.usage.lastUpdated).toISOString()
+      : new Date().toISOString();
+    
+    // Calculate period end (30 days from start)
+    const periodEnd = new Date(new Date(periodStart).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { error } = await client
+      .from('user_billing')
+      .upsert({
+        user_id: userId,
+        subscription_tier: billingData.subscription.tier,
+        subscription_status: billingData.subscription.status.toLowerCase(), // active/cancelled/expired/paused
+        monthly_limit: billingData.usage.tryOnsLimit,
+        monthly_used: billingData.usage.tryOnsUsed,
+        period_start: periodStart,
+        period_end: periodEnd,
+        razorpay_subscription_id: billingData.subscription.razorpaySubscriptionId || null,
+        subscription_auto_renew: billingData.subscription.autoRenew,
+      });
+
+    if (error) {
+      throw new Error(`Failed to save billing data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Increment usage count (atomic, race-condition safe)
+   */
+  public async incrementUsage(userId: string): Promise<boolean> {
+    const client = this.getClient();
+
+    const { data, error } = await client.rpc('increment_usage', {
+      p_user_id: userId
+    });
+
+    if (error) {
+      throw new Error(`Failed to increment usage: ${error.message}`);
+    }
+
+    return data as boolean; // Returns true if incremented, false if limit reached
+  }
+
+  /**
+   * Convert database billing record to UserBilling format
+   * Database schema: monthly_limit, monthly_used, period_start, period_end
+   * App format: usage { month, tryOnsUsed, tryOnsLimit, lastUpdated, history }
+   */
+  public dbBillingToUserBilling(dbBilling: any): any {
+    // Convert ISO timestamps to milliseconds
+    const periodStartMs = dbBilling.period_start 
+      ? new Date(dbBilling.period_start).getTime()
+      : Date.now();
+    const periodEndMs = dbBilling.period_end
+      ? new Date(dbBilling.period_end).getTime()
+      : Date.now() + 30 * 24 * 60 * 60 * 1000;
+
+    // Calculate current month from period_start
+    const periodStart = new Date(dbBilling.period_start || Date.now());
+    const month = `${periodStart.getFullYear()}-${String(periodStart.getMonth() + 1).padStart(2, '0')}`;
+
+    return {
+      subscription: {
+        tier: dbBilling.subscription_tier,
+        status: dbBilling.subscription_status.toUpperCase(), // ACTIVE/CANCELLED/EXPIRED/PAUSED
+        startDate: periodStartMs,
+        endDate: periodEndMs,
+        autoRenew: dbBilling.subscription_auto_renew || false,
+        razorpaySubscriptionId: dbBilling.razorpay_subscription_id,
+      },
+      usage: {
+        month: month,
+        tryOnsUsed: dbBilling.monthly_used,
+        tryOnsLimit: dbBilling.monthly_limit,
+        lastUpdated: periodStartMs,
+        history: [], // History not stored in this schema
+      },
+      oneTimePurchases: [], // Store in separate table if needed
+      transactions: [], // Store in separate table if needed
+    };
+  }
 }
 
 export const supabaseService = SupabaseService.getInstance();

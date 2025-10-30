@@ -162,13 +162,36 @@ export class BillingService {
   }
 
   /**
-   * Save user billing to localStorage
+   * Save user billing to localStorage AND sync to database
    */
   public saveUserBilling(billing: UserBilling): void {
     try {
+      // Save to localStorage for fast access
       localStorage.setItem(`${STORAGE_KEY_PREFIX}user`, JSON.stringify(billing));
+      
+      // Sync to Supabase if user is logged in
+      if (this.currentUserId) {
+        this.syncToSupabase(billing).catch(err => {
+          console.error('Failed to sync billing to Supabase:', err);
+        });
+      }
     } catch (e) {
       console.error('Failed to save user billing:', e);
+    }
+  }
+
+  /**
+   * Sync billing data to Supabase (background operation)
+   */
+  private async syncToSupabase(billing: UserBilling): Promise<void> {
+    if (!this.currentUserId) return;
+    
+    try {
+      const { supabaseService } = await import('./supabaseService');
+      await supabaseService.saveUserBilling(this.currentUserId, billing);
+    } catch (err) {
+      console.error('Supabase sync failed:', err);
+      throw err;
     }
   }
 
@@ -521,12 +544,47 @@ export class BillingService {
    */
   private currentUserId: string | null = null;
 
-  public setCurrentUser(userId: string | null): void {
+  public async setCurrentUser(userId: string | null): Promise<void> {
     this.currentUserId = userId;
+    
+    if (userId) {
+      // User logged in - load billing from Supabase database
+      await this.loadBillingFromSupabase(userId);
+    } else {
+      // User logged out - clear localStorage billing data
+      localStorage.removeItem(`${STORAGE_KEY_PREFIX}user`);
+    }
   }
 
   public getCurrentUserId(): string | null {
     return this.currentUserId;
+  }
+
+  /**
+   * Load billing data from Supabase on login
+   * This fixes the localStorage reset issue by loading from database
+   */
+  private async loadBillingFromSupabase(userId: string): Promise<void> {
+    try {
+      const { supabaseService } = await import('./supabaseService');
+      const dbBilling = await supabaseService.getUserBilling(userId);
+      
+      if (dbBilling) {
+        // Save to localStorage for fast access
+        localStorage.setItem(`${STORAGE_KEY_PREFIX}user`, JSON.stringify(dbBilling));
+        console.log('✅ Billing data loaded from database');
+      } else {
+        // No billing data yet - use default (will be created by database trigger)
+        const defaultBilling = this.getDefaultBilling();
+        this.saveUserBilling(defaultBilling);
+        console.log('✅ Initialized default billing data');
+      }
+    } catch (err) {
+      console.error('Failed to load billing from Supabase:', err);
+      // Fallback to default billing
+      const defaultBilling = this.getDefaultBilling();
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}user`, JSON.stringify(defaultBilling));
+    }
   }
 }
 
