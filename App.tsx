@@ -605,7 +605,7 @@ const AppContent: React.FC = () => {
 
     await razorpayService.cancelSubscription(
       billing.subscription.razorpaySubscriptionId,
-      user.id,
+      user.auth.id,
       () => {
         setIsLoading(false);
         setLoadingMessage('');
