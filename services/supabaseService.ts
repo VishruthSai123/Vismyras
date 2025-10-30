@@ -548,7 +548,9 @@ class SupabaseService {
       .order('expiry_date', { ascending: true });
 
     if (error) {
-      throw new Error(`Failed to load one-time purchases: ${error.message}`);
+      // Table doesn't exist yet - migration not run
+      console.warn('One-time purchases table not found - run migration 007');
+      return [];
     }
 
     return data || [];
