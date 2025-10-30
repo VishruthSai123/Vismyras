@@ -149,7 +149,7 @@ COMMENT ON TABLE public.user_billing IS 'User billing and subscription managemen
 COMMENT ON COLUMN public.user_billing.subscription_tier IS 'Subscription tier: FREE or PREMIUM';
 COMMENT ON COLUMN public.user_billing.subscription_status IS 'Subscription status: ACTIVE, CANCELLED, EXPIRED, or PAUSED';
 COMMENT ON COLUMN public.user_billing.usage_count IS 'Number of try-ons used in current period';
-COMMENT ON COLUMN public.user_billing.usage_limit IS 'Maximum try-ons allowed (10 for FREE, 1000 for PREMIUM)';
+COMMENT ON COLUMN public.user_billing.usage_limit IS 'Maximum try-ons allowed (10 for FREE, 50 for PREMIUM)';
 COMMENT ON COLUMN public.user_billing.razorpay_subscription_id IS 'Razorpay subscription ID for recurring payments';
 COMMENT ON COLUMN public.user_billing.razorpay_customer_id IS 'Razorpay customer ID';
 COMMENT ON COLUMN public.user_billing.subscription_auto_renew IS 'Whether subscription auto-renews';
@@ -364,7 +364,7 @@ BEGIN
         subscription_end_date = p_end_date,
         subscription_auto_renew = true,
         razorpay_subscription_id = p_subscription_id,
-        usage_limit = 1000,
+        usage_limit = 50,
         last_webhook_sync = NOW(),
         updated_at = NOW()
     WHERE user_id = p_user_id;

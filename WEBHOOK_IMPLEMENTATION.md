@@ -84,7 +84,7 @@ User Subscribes → Razorpay → Webhook → Database → User Gets Access
    - SET tier = 'PREMIUM'
    - SET status = 'ACTIVE'
    - SET end_date = period_end
-   - SET usage_limit = 1000
+   - SET usage_limit = 50
    ↓
 8. Logs to webhook_events table
    ↓

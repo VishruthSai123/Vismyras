@@ -131,7 +131,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: SubscriptionTier.PREMIUM,
     name: 'Premium',
     price: 199,
-    monthlyLimit: 100,
+    monthlyLimit: 50,
     description: 'Best for fashion enthusiasts',
     features: [
       '50 try-ons per month',
