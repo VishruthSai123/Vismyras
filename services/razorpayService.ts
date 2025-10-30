@@ -76,6 +76,35 @@ export class RazorpayService {
   }
 
   /**
+   * Create a Razorpay subscription
+   */
+  private async createSubscription(planId: string, userId: string): Promise<string> {
+    try {
+      const response = await fetch('/api/create-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          planId, 
+          userId,
+          totalCount: 12 // 12 months
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create subscription');
+      }
+
+      const data = await response.json();
+      return data.subscriptionId;
+    } catch (error) {
+      console.error('Error creating Razorpay subscription:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Create a payment order via Supabase Edge Function
    */
   private async createOrder(amount: number, currency: string, notes: any): Promise<string> {
@@ -170,20 +199,22 @@ export class RazorpayService {
       };
       billingService.addTransaction(transaction);
 
-      // Create order (pass amount directly in rupees)
-      const orderId = await this.createOrder(amount, 'INR', {
-        type: 'subscription',
-        plan: 'premium_monthly',
-      });
+      // Get user ID
+      const userId = billingService.getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
 
-      // Razorpay options
-      const options: RazorpayPaymentOptions = {
+      // Create Razorpay subscription (recurring) - requires plan_id from Razorpay dashboard
+      const RAZORPAY_PLAN_ID = import.meta.env.VITE_RAZORPAY_PLAN_ID || 'plan_PremiumMonthly';
+      const subscriptionId = await this.createSubscription(RAZORPAY_PLAN_ID, userId);
+
+      // Razorpay options for subscription
+      const options = {
         key: this.razorpayKeyId,
-        amount: amount, // Pass amount directly (rupees)
-        currency: 'INR',
+        subscription_id: subscriptionId, // Use subscription_id for recurring subscriptions
         name: 'Vismyras',
         description: `Premium Subscription - ₹${amount}/month`,
-        order_id: orderId,
         prefill: {
           name: '',
           email: '',
@@ -192,26 +223,14 @@ export class RazorpayService {
         theme: {
           color: '#a855f7', // Purple color
         },
-        handler: async (response: RazorpayPaymentResponse) => {
-          // Verify payment
-          const verified = await this.verifyPaymentSignature(
-            response.razorpay_order_id,
-            response.razorpay_payment_id,
-            response.razorpay_signature
-          );
-
-          if (verified) {
-            // Grant premium immediately (frontend fallback for instant feedback)
-            // Webhooks will also update, ensuring consistency
-            await billingService.upgradeToPremium(response.razorpay_payment_id);
-            onSuccess(response);
-          } else {
-            // Update transaction to failed
-            transaction.status = 'failed';
-            transaction.description = 'Payment verification failed';
-            billingService.addTransaction(transaction);
-            onFailure(new Error('Payment verification failed'));
-          }
+        handler: async (response: any) => {
+          // Subscription payment successful
+          // response contains: razorpay_payment_id, razorpay_subscription_id, razorpay_signature
+          
+          // Grant premium immediately with SUBSCRIPTION ID (not payment ID)
+          // Webhooks will also process subscription.activated event
+          await billingService.upgradeToPremium(response.razorpay_subscription_id);
+          onSuccess(response);
         },
         modal: {
           ondismiss: () => {
