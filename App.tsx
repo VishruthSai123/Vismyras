@@ -232,7 +232,7 @@ const AppContent: React.FC = () => {
     return currentLayer ? Object.keys(currentLayer.poseImages) : [];
   }, [outfitHistory, currentOutfitIndex]);
 
-  const handleModelFinalized = (id: string) => {
+  const handleModelFinalized = async (id: string) => {
     setModelImageId(id);
     
     // Generate unique workspace ID for this styling session
@@ -245,9 +245,9 @@ const AppContent: React.FC = () => {
     }]);
     setCurrentOutfitIndex(0);
     
-    // Track first try-on usage immediately
+    // Track first try-on usage immediately (database operation)
     try {
-      billingService.consumeTryOn('try-on');
+      await billingService.consumeTryOn('try-on');
       refreshUsageStats();
       
       addToast('✨ New styling workspace created! All changes will be saved as one unique style.', 'success', 4000);

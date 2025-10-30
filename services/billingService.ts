@@ -71,7 +71,8 @@ export class BillingService {
   }
 
   /**
-   * Load user billing from localStorage
+   * Load user billing from localStorage (cached from database)
+   * Note: Database is source of truth - period reset handled by database functions
    */
   public getUserBilling(): UserBilling {
     try {
@@ -79,17 +80,8 @@ export class BillingService {
       if (stored) {
         const billing: UserBilling = JSON.parse(stored);
         
-        // Check if month has changed, reset usage
-        if (billing.usage.month !== this.getCurrentMonth()) {
-          billing.usage = {
-            month: this.getCurrentMonth(),
-            tryOnsUsed: 0,
-            tryOnsLimit: SUBSCRIPTION_PLANS[billing.subscription.tier].monthlyLimit,
-            lastUpdated: Date.now(),
-            history: [],
-          };
-          this.saveUserBilling(billing);
-        }
+        // DO NOT reset usage here - database is source of truth
+        // Period reset is handled by database function should_reset_monthly_usage()
         
         // Check if subscription has expired and handle downgrade
         if (this.isSubscriptionExpired(billing)) {
@@ -233,47 +225,49 @@ export class BillingService {
 
   /**
    * Consume a try-on credit
-   * Uses atomic read-modify-write to prevent race conditions
+   * Uses database atomic operation to prevent race conditions
    */
-  public consumeTryOn(action: UsageHistoryEntry['action'], garmentId?: string): void {
-    // Get fresh billing data to avoid stale state
-    const billing = this.getUserBilling();
-    
-    const entry: UsageHistoryEntry = {
-      timestamp: Date.now(),
-      action,
-      garmentId,
-      cost: 0,
-    };
-    
-    // Try to use subscription credits first
-    if (billing.usage.tryOnsUsed < billing.usage.tryOnsLimit) {
-      billing.usage.tryOnsUsed++;
-      billing.usage.history.push(entry);
-      billing.usage.lastUpdated = Date.now();
-      this.saveUserBilling(billing);
-      return;
+  public async consumeTryOn(action: UsageHistoryEntry['action'], garmentId?: string): Promise<void> {
+    if (!this.currentUserId) {
+      throw new Error('User not logged in');
     }
-    
-    // Use one-time credits (find first available, non-expired purchase)
-    const now = Date.now();
-    for (const purchase of billing.oneTimePurchases) {
-      if (purchase.expiryDate > now && purchase.tryOnsCount > 0) {
-        purchase.tryOnsCount--;
-        entry.cost = 29; // Mark that this used a paid credit
-        billing.usage.history.push(entry);
-        billing.usage.lastUpdated = Date.now();
-        this.saveUserBilling(billing);
-        return;
+
+    // Use database atomic increment to prevent race conditions
+    try {
+      const { supabaseService } = await import('./supabaseService');
+      const success = await supabaseService.incrementUsage(this.currentUserId);
+      
+      if (!success) {
+        // Limit reached in database
+        const billing = this.getUserBilling();
+        throw new UsageLimitError(
+          'No available credits',
+          billing.usage.tryOnsUsed,
+          billing.usage.tryOnsLimit,
+          billing.subscription.tier
+        );
       }
+      
+      // Success - update localStorage cache
+      const billing = this.getUserBilling();
+      billing.usage.tryOnsUsed++;
+      billing.usage.lastUpdated = Date.now();
+      
+      const entry: UsageHistoryEntry = {
+        timestamp: Date.now(),
+        action,
+        garmentId,
+        cost: 0,
+      };
+      billing.usage.history.push(entry);
+      
+      // Update localStorage cache (database already updated)
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}user`, JSON.stringify(billing));
+      
+    } catch (err) {
+      console.error('Failed to consume try-on:', err);
+      throw err;
     }
-    
-    throw new UsageLimitError(
-      'No available credits',
-      billing.usage.tryOnsUsed,
-      billing.usage.tryOnsLimit,
-      billing.subscription.tier
-    );
   }
 
   /**
