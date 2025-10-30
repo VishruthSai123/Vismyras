@@ -296,31 +296,25 @@ const AppContent: React.FC = () => {
     // Check if this is a custom item with AI prompt
     const hasAiPrompt = garmentInfo.aiPrompt && garmentInfo.aiPrompt.trim().length > 0;
     
-    // Check if we're replacing an item of the same category
-    const isReplacement = !['Accessories'].includes(garmentInfo.category);
+    // Check if we're replacing an item of the same category (accessories can stack)
+    const canStack = garmentInfo.category === 'Accessories';
     const currentHistory = outfitHistory.slice(0, currentOutfitIndex + 1);
     
-    // Find the last item of the same category (to replace)
-    const lastSameCategoryIndex = isReplacement 
-      ? currentHistory.findLastIndex(layer => layer.garment?.category === garmentInfo.category)
-      : -1;
+    // Find if there's already an item of the same category
+    const lastSameCategoryIndex = canStack 
+      ? -1 // Accessories always stack, never replace
+      : currentHistory.findLastIndex(layer => layer.garment?.category === garmentInfo.category);
     
-    // Determine base image: if replacing, use image BEFORE the last same-category item
-    let baseImageForTryOn = displayImageId;
-    if (lastSameCategoryIndex > 0) {
-      // Get the image from the layer before the item we're replacing
-      const previousLayer = currentHistory[lastSameCategoryIndex - 1];
-      const currentPoseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
-      baseImageForTryOn = previousLayer.poseImages[currentPoseInstruction] || displayImageId;
-    } else if (lastSameCategoryIndex === 0 && modelImageId) {
-      // If the item to replace is the first layer, use the base model image
-      baseImageForTryOn = modelImageId;
-    }
+    const isReplacing = lastSameCategoryIndex >= 0;
+    
+    // ALWAYS use the current visible image as base
+    // The AI will intelligently replace only the target category while preserving others
+    const baseImageForTryOn = displayImageId!;
     
     setLoadingMessage(
       hasAiPrompt 
         ? `✨ Applying with AI: "${garmentInfo.aiPrompt}"...` 
-        : lastSameCategoryIndex >= 0
+        : isReplacing
           ? `Replacing ${garmentInfo.category.toLowerCase()}...`
           : garmentInfo.category === 'Accessories' 
             ? `Adding ${garmentInfo.name}...` 
@@ -345,26 +339,24 @@ const AppContent: React.FC = () => {
         poseImages: { [currentPoseInstruction]: newImageId } 
       };
 
-      let newHistoryLength = 0;
-      
       setOutfitHistory(prevHistory => {
         let newHistory = prevHistory.slice(0, currentOutfitIndex + 1);
         
-        // If replacing same category, remove the old item from history
-        if (lastSameCategoryIndex >= 0) {
-          newHistory = [
-            ...newHistory.slice(0, lastSameCategoryIndex),
-            ...newHistory.slice(lastSameCategoryIndex + 1)
-          ];
+        if (isReplacing) {
+          // REPLACING: Update the layer in-place (AI preserves other clothing)
+          newHistory = newHistory.map((layer, index) => 
+            index === lastSameCategoryIndex ? newLayer : layer
+          );
+        } else {
+          // ADDING: Stack on top of current outfit
+          newHistory = [...newHistory, newLayer];
         }
         
-        const finalHistory = [...newHistory, newLayer];
-        newHistoryLength = finalHistory.length;
-        return finalHistory;
+        return newHistory;
       });
       
-      // Set index to the newly added layer (last item in the array)
-      setCurrentOutfitIndex(newHistoryLength - 1);
+      // Set index to show the new/updated layer
+      setCurrentOutfitIndex(isReplacing ? lastSameCategoryIndex : currentOutfitIndex + 1);
       
       // Add to wardrobe if it's a new custom item
       setWardrobe(prev => {

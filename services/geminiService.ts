@@ -122,31 +122,74 @@ export const generateVirtualTryOnImage = async (
     
     const isAccessory = garmentCategory === 'Accessories';
 
-    // Category-specific replacement instructions
+    // Category-specific replacement instructions with preservation rules
     const categoryInstructions: Record<string, string> = {
-        'Tops': 'FIRST completely remove any existing shirt, t-shirt, blouse, or upper body clothing. Then replace it with the new top from the garment image. The new top should be the ONLY upper body clothing visible.',
-        'Bottoms': 'FIRST completely remove any existing pants, trousers, jeans, skirt, or lower body clothing. Then replace it with the new bottom from the garment image. The new bottom should be the ONLY lower body clothing visible.',
-        'Dresses': 'FIRST completely remove the entire current outfit (both top and bottom). Then replace it with the new dress from the garment image. The dress should be the ONLY clothing item visible on the body.',
-        'Outerwear': 'FIRST completely remove any existing jacket, blazer, coat, or outer layer. Then replace it with the new outerwear from the garment image. Keep the inner clothing (shirt/top) but replace only the outer layer.',
-        'Shoes': 'FIRST completely remove any existing footwear. Then replace it with the new shoes from the garment image. The new shoes should be the ONLY footwear visible.',
-        'Indian Festive': 'FIRST completely remove the entire current outfit. Then replace it with the new traditional outfit from the garment image. The traditional outfit should be the ONLY clothing visible.',
-        'Custom': 'FIRST identify and completely remove any existing clothing that occupies the same area as the new garment. Then replace it with the new garment from the garment image.'
+        'Tops': `ONLY replace the upper body clothing (shirt/t-shirt/blouse/top).
+        - REMOVE: Any existing shirt, t-shirt, blouse, or upper body garment
+        - REPLACE WITH: The new top from the garment image
+        - PRESERVE: All bottoms (pants/jeans/skirts), outerwear (jackets/blazers), shoes, and accessories exactly as they are`,
+        
+        'Bottoms': `ONLY replace the lower body clothing (pants/jeans/skirt).
+        - REMOVE: Any existing pants, trousers, jeans, skirt, or lower body garment
+        - REPLACE WITH: The new bottom from the garment image
+        - PRESERVE: All tops (shirts/blouses), outerwear (jackets/blazers), shoes, and accessories exactly as they are`,
+        
+        'Dresses': `Replace the entire dress/full outfit.
+        - REMOVE: The entire current outfit (both top and bottom)
+        - REPLACE WITH: The new dress from the garment image
+        - PRESERVE: Only shoes and accessories if present`,
+        
+        'Outerwear': `ONLY replace the outer layer (jacket/blazer/coat).
+        - REMOVE: Any existing jacket, blazer, coat, cardigan, or outer layer
+        - REPLACE WITH: The new outerwear from the garment image
+        - PRESERVE: All inner clothing (shirt/top underneath), bottoms (pants), shoes, and accessories exactly as they are. The inner clothing should be visible where appropriate (collar, sleeves if jacket is open, etc.)`,
+        
+        'Shoes': `ONLY replace the footwear.
+        - REMOVE: Any existing shoes, sneakers, boots, sandals, or footwear
+        - REPLACE WITH: The new shoes from the garment image
+        - PRESERVE: All clothing (tops, bottoms, outerwear), and accessories exactly as they are`,
+        
+        'Indian Festive': `Replace the entire traditional outfit.
+        - REMOVE: The entire current outfit (all clothing items)
+        - REPLACE WITH: The new traditional outfit from the garment image
+        - PRESERVE: Only shoes and accessories if appropriate for the traditional outfit`,
+        
+        'Custom': `Replace the specific garment intelligently.
+        - REMOVE: Any existing clothing that occupies the same body area as the new garment
+        - REPLACE WITH: The new garment from the garment image
+        - PRESERVE: All other clothing items not in the same category`
     };
 
     const categoryInstruction = categoryInstructions[garmentCategory] || categoryInstructions['Custom'];
 
-    const clothingPrompt = `You are an expert virtual try-on AI. You will be given a 'model image' and a 'garment image'. Your task is to create a new photorealistic image where the person from the 'model image' is wearing the clothing from the 'garment image'.
+    const clothingPrompt = `You are an expert virtual try-on AI specialist. You will be given a 'model image' showing a person in their current outfit, and a 'garment image' showing a new clothing item. Your task is to intelligently replace ONLY the specific category of clothing while preserving everything else.
 
-**Category: ${garmentCategory}**
-**Replacement Instructions:** ${categoryInstruction}
+**Target Category: ${garmentCategory}**
 
-**Crucial Rules:**
-1.  **Complete Garment Replacement:** You MUST completely REMOVE and REPLACE the relevant clothing item with the new garment. No part of the original clothing in that category (e.g., old shirt collar, sleeves, patterns) should be visible in the final image.
-2.  **Clean Removal:** Before applying the new garment, ensure the old clothing in that category is completely erased. Do not leave any traces, edges, or remnants of the original item.
-3.  **Preserve the Model:** The person's face, hair, body shape, skin tone, and pose from the 'model image' MUST remain unchanged.
-4.  **Preserve the Background:** The entire background from the 'model image' MUST be preserved perfectly.
-5.  **Realistic Application:** Realistically fit the new garment onto the person. It should adapt to their pose with natural folds, wrinkles, shadows, and lighting consistent with the original scene.
-6.  **Output:** Return ONLY the final, edited image. Do not include any text.`;
+**Your Instructions:**
+${categoryInstruction}
+
+**Critical Rules:**
+1.  **Selective Replacement:** ONLY modify the clothing in the target category (${garmentCategory}). All other clothing categories MUST remain completely unchanged and visible.
+2.  **Complete Category Removal:** Fully remove the old item from the target category. No traces, edges, colors, or patterns from the old ${garmentCategory.toLowerCase()} should remain visible.
+3.  **Preserve Everything Else:** 
+    - Keep the person's face, hair, body shape, skin tone, and pose exactly the same
+    - Keep all clothing from OTHER categories exactly as they appear in the model image
+    - Keep the background completely unchanged
+    - Maintain all accessories (watches, jewelry, bags, etc.)
+4.  **Realistic Integration:** The new ${garmentCategory.toLowerCase()} should fit naturally with:
+    - The person's pose and body
+    - The lighting and shadows of the scene
+    - Any remaining clothing items (proper layering, no overlap issues)
+    - Natural folds, wrinkles, and fabric behavior
+5.  **Smart Layering:** Understand clothing layers:
+    - Tops go under outerwear (jackets/blazers)
+    - Outerwear goes over tops
+    - Bottoms are independent from tops and outerwear
+    - Accessories stack on top of everything
+6.  **Output:** Return ONLY the final edited image with no text or explanations.
+
+**Example:** If replacing a blue shirt with a red shirt while the person is wearing grey pants and a black jacket, the result should show: red shirt (new), grey pants (preserved), black jacket (preserved) - all properly layered.`;
 
     const accessoryPrompt = `You are an expert virtual try-on AI. You will be given a 'model image' and an 'accessory image'. Your task is to realistically ADD the accessory from the 'accessory image' onto the person in the 'model image'.
 
