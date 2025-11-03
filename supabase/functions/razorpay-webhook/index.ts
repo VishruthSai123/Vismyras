@@ -283,17 +283,38 @@ serve(async (req) => {
     const signature = req.headers.get('X-Razorpay-Signature');
     const body = await req.text();
 
+    // Log for debugging
+    console.log('📨 Webhook request received');
+    console.log('Signature present:', !!signature);
+    console.log('Webhook secret configured:', !!RAZORPAY_WEBHOOK_SECRET);
+    
     if (!signature) {
-      console.error('Missing webhook signature');
+      console.warn('⚠️ Missing webhook signature - likely a test ping from Razorpay');
+      try {
+        const testEvent = JSON.parse(body);
+        console.log('Test event type:', testEvent.event || 'unknown');
+      } catch (e) {
+        console.log('Non-JSON test request');
+      }
+      // Return 200 to stop retry loop
       return new Response(
-        JSON.stringify({ error: 'Missing signature' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ received: true, message: 'Webhook endpoint active - test ping accepted' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!RAZORPAY_WEBHOOK_SECRET) {
+      console.error('❌ RAZORPAY_WEBHOOK_SECRET not configured in Supabase');
+      return new Response(
+        JSON.stringify({ error: 'Webhook secret not configured' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     // Verify signature
     if (!verifyWebhookSignature(body, signature)) {
-      console.error('Invalid webhook signature');
+      console.error('❌ Invalid webhook signature');
+      console.error('Expected signature format check failed');
       return new Response(
         JSON.stringify({ error: 'Invalid signature' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
